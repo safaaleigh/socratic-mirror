@@ -1,36 +1,78 @@
-import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-// Validation schemas
+import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+
+// Input validation schemas from contract
 const createLessonSchema = z.object({
-	title: z.string().min(1).max(200),
-	description: z.string().optional(),
-	content: z.string().min(1),
+	title: z
+		.string()
+		.min(1, "Title is required")
+		.max(200, "Title must not exceed 200 characters"),
+	description: z.string().min(1, "Description is required"),
+	content: z.string().min(1, "Content is required"),
 	objectives: z.array(z.string()).default([]),
+	keyQuestions: z.array(z.string()).default([]),
 	facilitationStyle: z
 		.enum(["exploratory", "analytical", "ethical"])
 		.default("exploratory"),
-	keyQuestions: z.array(z.string()).default([]),
-	suggestedDuration: z.number().min(5).max(180).optional(),
-	suggestedGroupSize: z.number().min(2).max(10).default(3),
-	isPublished: z.boolean().default(false),
+	suggestedDuration: z.number().int().positive().optional(),
+	suggestedGroupSize: z.number().int().positive().default(3),
 });
 
-const updateLessonSchema = createLessonSchema.partial().extend({
+const updateLessonSchema = z.object({
+	id: z.string().cuid(),
+	title: z.string().min(1).max(200).optional(),
+	description: z.string().min(1).optional(),
+	content: z.string().min(1).optional(),
+	objectives: z.array(z.string()).optional(),
+	keyQuestions: z.array(z.string()).optional(),
+	facilitationStyle: z
+		.enum(["exploratory", "analytical", "ethical"])
+		.optional(),
+	suggestedDuration: z.number().int().positive().optional(),
+	suggestedGroupSize: z.number().int().positive().optional(),
+});
+
+const lessonIdSchema = z.object({
 	id: z.string().cuid(),
 });
 
-const lessonFilterSchema = z.object({
-	isPublished: z.boolean().optional(),
-	isArchived: z.boolean().optional(),
-	creatorId: z.string().optional(),
-	limit: z.number().min(1).max(100).default(20),
-	offset: z.number().min(0).default(0),
+const deleteLessonSchema = z.object({
+	id: z.string().cuid(),
+	handleActiveDiscussions: z.enum(["complete", "end"]),
 });
 
+const forkLessonSchema = z.object({
+	id: z.string().cuid(),
+	newTitle: z.string().min(1).max(200).optional(),
+});
+
+// Helper function to compute lesson status and permissions
+function computeLessonMetadata(lesson: any, currentUserId: string) {
+	const isOwner = lesson.creatorId === currentUserId;
+
+	let status: "draft" | "published" | "archived";
+	if (lesson.isArchived) {
+		status = "archived";
+	} else if (lesson.isPublished) {
+		status = "published";
+	} else {
+		status = "draft";
+	}
+
+	return {
+		...lesson,
+		status,
+		canEdit: isOwner && !lesson.isArchived,
+		canPublish: isOwner && !lesson.isPublished && !lesson.isArchived,
+		canArchive: isOwner && lesson.isPublished && !lesson.isArchived,
+		canDelete: isOwner,
+	};
+}
+
 export const lessonRouter = createTRPCRouter({
-	// Create a new lesson
+	// Create new lesson (T010)
 	create: protectedProcedure
 		.input(createLessonSchema)
 		.mutation(async ({ ctx, input }) => {
@@ -38,23 +80,64 @@ export const lessonRouter = createTRPCRouter({
 				data: {
 					...input,
 					creatorId: ctx.session.user.id,
-					publishedAt: input.isPublished ? new Date() : null,
 				},
 			});
 
-			return lesson;
+			return computeLessonMetadata(lesson, ctx.session.user.id);
 		}),
 
-	// Update an existing lesson
+	// List user's lessons (T011)
+	list: protectedProcedure.query(async ({ ctx }) => {
+		const lessons = await ctx.db.lesson.findMany({
+			where: {
+				creatorId: ctx.session.user.id,
+			},
+			orderBy: {
+				updatedAt: "desc",
+			},
+		});
+
+		return lessons.map((lesson) =>
+			computeLessonMetadata(lesson, ctx.session.user.id),
+		);
+	}),
+
+	// Get lesson by ID (T012)
+	getById: protectedProcedure
+		.input(lessonIdSchema)
+		.query(async ({ ctx, input }) => {
+			const lesson = await ctx.db.lesson.findUnique({
+				where: {
+					id: input.id,
+				},
+			});
+
+			if (!lesson) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Lesson not found",
+				});
+			}
+
+			if (lesson.creatorId !== ctx.session.user.id) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "Access denied",
+				});
+			}
+
+			return computeLessonMetadata(lesson, ctx.session.user.id);
+		}),
+
+	// Update lesson (T013)
 	update: protectedProcedure
 		.input(updateLessonSchema)
 		.mutation(async ({ ctx, input }) => {
-			const { id, ...data } = input;
+			const { id, ...updateData } = input;
 
-			// Check if user owns the lesson
+			// Check if lesson exists and user owns it
 			const existingLesson = await ctx.db.lesson.findUnique({
 				where: { id },
-				select: { creatorId: true, isPublished: true },
 			});
 
 			if (!existingLesson) {
@@ -67,41 +150,32 @@ export const lessonRouter = createTRPCRouter({
 			if (existingLesson.creatorId !== ctx.session.user.id) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You don't have permission to update this lesson",
+					message: "Access denied",
 				});
 			}
 
-			// Handle publish state change
-			const publishUpdate =
-				data.isPublished !== undefined &&
-				data.isPublished !== existingLesson.isPublished
-					? { publishedAt: data.isPublished ? new Date() : null }
-					: {};
+			// Check if lesson can be edited (not archived)
+			if (existingLesson.isArchived) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "Archived lessons cannot be edited",
+				});
+			}
 
 			const updatedLesson = await ctx.db.lesson.update({
 				where: { id },
-				data: {
-					...data,
-					...publishUpdate,
-				},
+				data: updateData,
 			});
 
-			return updatedLesson;
+			return computeLessonMetadata(updatedLesson, ctx.session.user.id);
 		}),
 
-	// Publish or unpublish a lesson
+	// Publish lesson (T014)
 	publish: protectedProcedure
-		.input(
-			z.object({
-				id: z.string().cuid(),
-				isPublished: z.boolean(),
-			}),
-		)
+		.input(lessonIdSchema)
 		.mutation(async ({ ctx, input }) => {
-			// Check ownership
 			const lesson = await ctx.db.lesson.findUnique({
 				where: { id: input.id },
-				select: { creatorId: true },
 			});
 
 			if (!lesson) {
@@ -114,34 +188,35 @@ export const lessonRouter = createTRPCRouter({
 			if (lesson.creatorId !== ctx.session.user.id) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You don't have permission to publish this lesson",
+					message: "Access denied",
 				});
 			}
 
-			const updatedLesson = await ctx.db.lesson.update({
+			// Check if lesson can be published (draft state)
+			if (lesson.isPublished || lesson.isArchived) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "Only draft lessons can be published",
+				});
+			}
+
+			const publishedLesson = await ctx.db.lesson.update({
 				where: { id: input.id },
 				data: {
-					isPublished: input.isPublished,
-					publishedAt: input.isPublished ? new Date() : null,
+					isPublished: true,
+					publishedAt: new Date(),
 				},
 			});
 
-			return updatedLesson;
+			return computeLessonMetadata(publishedLesson, ctx.session.user.id);
 		}),
 
-	// Archive or unarchive a lesson
+	// Archive lesson (T015)
 	archive: protectedProcedure
-		.input(
-			z.object({
-				id: z.string().cuid(),
-				isArchived: z.boolean(),
-			}),
-		)
+		.input(lessonIdSchema)
 		.mutation(async ({ ctx, input }) => {
-			// Check ownership
 			const lesson = await ctx.db.lesson.findUnique({
 				where: { id: input.id },
-				select: { creatorId: true },
 			});
 
 			if (!lesson) {
@@ -154,213 +229,140 @@ export const lessonRouter = createTRPCRouter({
 			if (lesson.creatorId !== ctx.session.user.id) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You don't have permission to archive this lesson",
+					message: "Access denied",
 				});
 			}
 
-			const updatedLesson = await ctx.db.lesson.update({
+			// Check if lesson can be archived (published state)
+			if (!lesson.isPublished || lesson.isArchived) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "Only published lessons can be archived",
+				});
+			}
+
+			const archivedLesson = await ctx.db.lesson.update({
 				where: { id: input.id },
-				data: {
-					isArchived: input.isArchived,
-				},
-			});
-
-			return updatedLesson;
-		}),
-
-	// List lessons with filtering
-	list: protectedProcedure
-		.input(lessonFilterSchema)
-		.query(async ({ ctx, input }) => {
-			const where = {
-				...(input.isPublished !== undefined && {
-					isPublished: input.isPublished,
-				}),
-				...(input.isArchived !== undefined && { isArchived: input.isArchived }),
-				...(input.creatorId && { creatorId: input.creatorId }),
-			};
-
-			const [lessons, total] = await Promise.all([
-				ctx.db.lesson.findMany({
-					where,
-					take: input.limit,
-					skip: input.offset,
-					orderBy: { createdAt: "desc" },
-					include: {
-						creator: {
-							select: {
-								id: true,
-								name: true,
-								email: true,
-								image: true,
-							},
-						},
-						_count: {
-							select: {
-								discussions: true,
-							},
-						},
-					},
-				}),
-				ctx.db.lesson.count({ where }),
-			]);
-
-			return {
-				lessons,
-				total,
-				hasMore: input.offset + input.limit < total,
-			};
-		}),
-
-	// Get a single lesson by ID
-	getById: protectedProcedure
-		.input(z.string().cuid())
-		.query(async ({ ctx, input }) => {
-			const lesson = await ctx.db.lesson.findUnique({
-				where: { id: input },
-				include: {
-					creator: {
-						select: {
-							id: true,
-							name: true,
-							email: true,
-							image: true,
-						},
-					},
-					discussions: {
-						where: {
-							isActive: true,
-						},
-						select: {
-							id: true,
-							name: true,
-							isActive: true,
-							scheduledFor: true,
-							_count: {
-								select: {
-									participants: true,
-									messages: true,
-								},
-							},
-						},
-						take: 5,
-						orderBy: { createdAt: "desc" },
-					},
-				},
-			});
-
-			if (!lesson) {
-				throw new TRPCError({
-					code: "NOT_FOUND",
-					message: "Lesson not found",
-				});
-			}
-
-			// Check if user can view this lesson
-			const canView =
-				lesson.isPublished || lesson.creatorId === ctx.session.user.id;
-
-			if (!canView) {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "You don't have permission to view this lesson",
-				});
-			}
-
-			return lesson;
-		}),
-
-	// Get lessons created by the current user
-	myLessons: protectedProcedure
-		.input(
-			z.object({
-				limit: z.number().min(1).max(50).default(10),
-				offset: z.number().min(0).default(0),
-			}),
-		)
-		.query(async ({ ctx, input }) => {
-			const [lessons, total] = await Promise.all([
-				ctx.db.lesson.findMany({
-					where: {
-						creatorId: ctx.session.user.id,
-					},
-					take: input.limit,
-					skip: input.offset,
-					orderBy: { updatedAt: "desc" },
-					include: {
-						_count: {
-							select: {
-								discussions: true,
-							},
-						},
-					},
-				}),
-				ctx.db.lesson.count({
-					where: {
-						creatorId: ctx.session.user.id,
-					},
-				}),
-			]);
-
-			return {
-				lessons,
-				total,
-				hasMore: input.offset + input.limit < total,
-			};
-		}),
-
-	// Delete a lesson (soft delete by archiving)
-	delete: protectedProcedure
-		.input(z.string().cuid())
-		.mutation(async ({ ctx, input }) => {
-			// Check ownership
-			const lesson = await ctx.db.lesson.findUnique({
-				where: { id: input },
-				select: {
-					creatorId: true,
-					_count: {
-						select: {
-							discussions: {
-								where: {
-									isActive: true,
-								},
-							},
-						},
-					},
-				},
-			});
-
-			if (!lesson) {
-				throw new TRPCError({
-					code: "NOT_FOUND",
-					message: "Lesson not found",
-				});
-			}
-
-			if (lesson.creatorId !== ctx.session.user.id) {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "You don't have permission to delete this lesson",
-				});
-			}
-
-			// Prevent deletion if there are active discussions
-			if (lesson._count.discussions > 0) {
-				throw new TRPCError({
-					code: "PRECONDITION_FAILED",
-					message: "Cannot delete lesson with active discussions",
-				});
-			}
-
-			// Soft delete by archiving and unpublishing
-			const deletedLesson = await ctx.db.lesson.update({
-				where: { id: input },
 				data: {
 					isArchived: true,
-					isPublished: false,
 				},
 			});
 
-			return deletedLesson;
+			return computeLessonMetadata(archivedLesson, ctx.session.user.id);
+		}),
+
+	// Delete lesson (T016)
+	delete: protectedProcedure
+		.input(deleteLessonSchema)
+		.mutation(async ({ ctx, input }) => {
+			const lesson = await ctx.db.lesson.findUnique({
+				where: { id: input.id },
+				include: {
+					discussions: true,
+				},
+			});
+
+			if (!lesson) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Lesson not found",
+				});
+			}
+
+			if (lesson.creatorId !== ctx.session.user.id) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "Access denied",
+				});
+			}
+
+			const affectedDiscussions = lesson.discussions.length;
+
+			// Handle active discussions based on user choice
+			if (input.handleActiveDiscussions === "end") {
+				// End discussions immediately by setting closedAt
+				await ctx.db.discussion.updateMany({
+					where: {
+						lessonId: input.id,
+						closedAt: null,
+					},
+					data: {
+						closedAt: new Date(),
+						isActive: false,
+					},
+				});
+			}
+			// For "complete" option, we just unlink the lesson but let discussions continue
+
+			// Unlink lesson from discussions (set lessonId to null)
+			await ctx.db.discussion.updateMany({
+				where: {
+					lessonId: input.id,
+				},
+				data: {
+					lessonId: null,
+				},
+			});
+
+			// Delete the lesson
+			await ctx.db.lesson.delete({
+				where: { id: input.id },
+			});
+
+			return {
+				success: true,
+				affectedDiscussions,
+			};
+		}),
+
+	// Fork lesson (T017)
+	fork: protectedProcedure
+		.input(forkLessonSchema)
+		.mutation(async ({ ctx, input }) => {
+			const originalLesson = await ctx.db.lesson.findUnique({
+				where: { id: input.id },
+			});
+
+			if (!originalLesson) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Lesson not found",
+				});
+			}
+
+			if (originalLesson.creatorId !== ctx.session.user.id) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "Access denied",
+				});
+			}
+
+			// Check if lesson can be forked (archived state)
+			if (!originalLesson.isArchived) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "Only archived lessons can be forked",
+				});
+			}
+
+			// Create new lesson as fork
+			const forkedLesson = await ctx.db.lesson.create({
+				data: {
+					title: input.newTitle || `${originalLesson.title} (Copy)`,
+					description: originalLesson.description,
+					content: originalLesson.content,
+					objectives: originalLesson.objectives,
+					keyQuestions: originalLesson.keyQuestions,
+					facilitationStyle: originalLesson.facilitationStyle,
+					suggestedDuration: originalLesson.suggestedDuration,
+					suggestedGroupSize: originalLesson.suggestedGroupSize,
+					creatorId: ctx.session.user.id,
+					// New lesson starts as draft
+					isPublished: false,
+					isArchived: false,
+				},
+			});
+
+			return computeLessonMetadata(forkedLesson, ctx.session.user.id);
 		}),
 });

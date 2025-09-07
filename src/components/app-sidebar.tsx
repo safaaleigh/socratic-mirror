@@ -1,4 +1,10 @@
-import { BookOpen } from "lucide-react";
+import {
+	BarChart3,
+	BookOpen,
+	GraduationCap,
+	MessageCircle,
+	Users,
+} from "lucide-react";
 import type * as React from "react";
 
 import {
@@ -17,77 +23,24 @@ import {
 const data = {
 	navMain: [
 		{
-			title: "Learning Paths",
-			url: "#",
-			items: [
-				{
-					title: "Mathematics",
-					url: "#",
-				},
-				{
-					title: "Science",
-					url: "#",
-				},
-				{
-					title: "Philosophy",
-					url: "#",
-					isActive: true,
-				},
-			],
+			title: "Lessons",
+			url: "/lessons",
+			icon: GraduationCap,
 		},
 		{
-			title: "Discussion Forums",
-			url: "#",
-			items: [
-				{
-					title: "Active Debates",
-					url: "#",
-				},
-				{
-					title: "Question & Answer",
-					url: "#",
-				},
-				{
-					title: "Study Groups",
-					url: "#",
-				},
-			],
+			title: "Discussions",
+			url: "/discussions",
+			icon: MessageCircle,
 		},
 		{
-			title: "My Progress",
-			url: "#",
-			items: [
-				{
-					title: "Completed Lessons",
-					url: "#",
-				},
-				{
-					title: "Achievements",
-					url: "#",
-				},
-				{
-					title: "Learning Analytics",
-					url: "#",
-				},
-			],
+			title: "Groups",
+			url: "/groups",
+			icon: Users,
 		},
 		{
-			title: "Resources",
-			url: "#",
-			items: [
-				{
-					title: "Library",
-					url: "#",
-				},
-				{
-					title: "Tools",
-					url: "#",
-				},
-				{
-					title: "External Links",
-					url: "#",
-				},
-			],
+			title: "Dashboard",
+			url: "/dashboard",
+			icon: BarChart3,
 		},
 	],
 };
@@ -115,26 +68,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 			<SidebarContent>
 				<SidebarGroup>
 					<SidebarMenu className="gap-2">
-						{data.navMain.map((item) => (
-							<SidebarMenuItem key={item.title}>
-								<SidebarMenuButton asChild>
-									<a href={item.url} className="font-medium">
-										{item.title}
-									</a>
-								</SidebarMenuButton>
-								{item.items?.length ? (
-									<SidebarMenuSub className="ml-0 border-l-0 px-1.5">
-										{item.items.map((item) => (
-											<SidebarMenuSubItem key={item.title}>
-												<SidebarMenuSubButton asChild isActive={item.isActive}>
-													<a href={item.url}>{item.title}</a>
-												</SidebarMenuSubButton>
-											</SidebarMenuSubItem>
-										))}
-									</SidebarMenuSub>
-								) : null}
-							</SidebarMenuItem>
-						))}
+						{data.navMain.map((item) => {
+							const Icon = item.icon;
+							return (
+								<SidebarMenuItem key={item.title}>
+									<SidebarMenuButton asChild>
+										<a href={item.url} className="font-medium">
+											<Icon className="size-4" />
+											{item.title}
+										</a>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
+							);
+						})}
 					</SidebarMenu>
 				</SidebarGroup>
 			</SidebarContent>
