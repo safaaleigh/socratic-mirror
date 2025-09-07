@@ -4,7 +4,6 @@ import { discussionRouter } from "@/server/api/routers/discussion";
 import { groupRouter } from "@/server/api/routers/group";
 import { invitationRouter } from "@/server/api/routers/invitation";
 import { lessonRouter } from "@/server/api/routers/lesson";
-import { postRouter } from "@/server/api/routers/post";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 
 /**
@@ -14,7 +13,6 @@ import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
  */
 export const appRouter = createTRPCRouter({
 	auth: authRouter,
-	post: postRouter,
 	lesson: lessonRouter,
 	group: groupRouter,
 	discussion: discussionRouter,
@@ -29,7 +27,7 @@ export type AppRouter = typeof appRouter;
  * Create a server-side caller for the tRPC API.
  * @example
  * const trpc = createCaller(createContext);
- * const res = await trpc.post.all();
- *       ^? Post[]
+ * const res = await trpc.lesson.getAll();
+ *       ^? Lesson[]
  */
 export const createCaller = createCallerFactory(appRouter);

@@ -55,7 +55,7 @@ export default function SignOut() {
 						</CardHeader>
 						<CardContent>
 							<div className="flex items-center justify-center py-4">
-								<div className="h-6 w-6 animate-spin rounded-full border-primary border-b-2"></div>
+								<div className="h-6 w-6 animate-spin rounded-full border-primary border-b-2" />
 							</div>
 						</CardContent>
 					</Card>

@@ -86,57 +86,56 @@ async function checkInvitePermission(
 		}
 
 		return group;
-	} else {
-		// Check if user is creator or moderator of the discussion
-		const participant = await db.discussionParticipant.findFirst({
-			where: {
-				discussionId: targetId,
-				userId,
-				role: { in: ["CREATOR", "MODERATOR"] },
-				status: "ACTIVE",
-			},
+	}
+	// Check if user is creator or moderator of the discussion
+	const participant = await db.discussionParticipant.findFirst({
+		where: {
+			discussionId: targetId,
+			userId,
+			role: { in: ["CREATOR", "MODERATOR"] },
+			status: "ACTIVE",
+		},
+	});
+
+	if (!participant) {
+		throw new TRPCError({
+			code: "FORBIDDEN",
+			message: "You don't have permission to invite to this discussion",
 		});
+	}
 
-		if (!participant) {
-			throw new TRPCError({
-				code: "FORBIDDEN",
-				message: "You don't have permission to invite to this discussion",
-			});
-		}
-
-		// Get discussion info for validation
-		const discussion = await db.discussion.findUnique({
-			where: { id: targetId },
-			select: {
-				name: true,
-				isActive: true,
-				maxParticipants: true,
-				_count: {
-					select: {
-						participants: {
-							where: { status: "ACTIVE" },
-						},
+	// Get discussion info for validation
+	const discussion = await db.discussion.findUnique({
+		where: { id: targetId },
+		select: {
+			name: true,
+			isActive: true,
+			maxParticipants: true,
+			_count: {
+				select: {
+					participants: {
+						where: { status: "ACTIVE" },
 					},
 				},
 			},
+		},
+	});
+
+	if (!discussion) {
+		throw new TRPCError({
+			code: "NOT_FOUND",
+			message: "Discussion not found",
 		});
-
-		if (!discussion) {
-			throw new TRPCError({
-				code: "NOT_FOUND",
-				message: "Discussion not found",
-			});
-		}
-
-		if (!discussion.isActive) {
-			throw new TRPCError({
-				code: "PRECONDITION_FAILED",
-				message: "Discussion is not active",
-			});
-		}
-
-		return discussion;
 	}
+
+	if (!discussion.isActive) {
+		throw new TRPCError({
+			code: "PRECONDITION_FAILED",
+			message: "Discussion is not active",
+		});
+	}
+
+	return discussion;
 }
 
 export const invitationRouter = createTRPCRouter({
