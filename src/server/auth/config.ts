@@ -81,13 +81,24 @@ export const authConfig = {
 		}),
 	],
 	adapter: PrismaAdapter(db),
+	session: { strategy: "jwt" },
+	pages: {
+		signIn: "/auth/signin",
+		signOut: "/auth/signout",
+	},
 	callbacks: {
-		session: ({ session, user }) => ({
+		session: ({ session, token }) => ({
 			...session,
 			user: {
 				...session.user,
-				id: user.id,
+				id: token.sub,
 			},
 		}),
+		jwt: ({ token, user }) => {
+			if (user) {
+				token.id = user.id;
+			}
+			return token;
+		},
 	},
 } satisfies NextAuthConfig;
