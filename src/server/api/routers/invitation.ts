@@ -1,96 +1,84 @@
-import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
-import type {
-	GroupRole,
-	InvitationStatus,
-	InvitationType,
-	ParticipantRole,
-} from "@prisma/client";
+import {
+	createTRPCRouter,
+	protectedProcedure,
+	publicProcedure,
+} from "@/server/api/trpc";
+import { emailService } from "@/server/services/email";
+import { getWebSocketService } from "@/server/services/websocket";
+import type { InvitationStatus, ParticipantRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-// Validation schemas
-const createInvitationSchema = z.object({
-	type: z.enum(["GROUP", "DISCUSSION"]),
-	targetId: z.string().cuid(),
-	recipientEmail: z.string().email(),
-	message: z.string().max(500).optional(),
-	expiresIn: z.number().min(1).max(30).default(7), // Days until expiration
+// Contract-compliant validation schemas
+const sendInvitationsSchema = z.object({
+	discussionId: z.string().cuid(),
+	invitations: z
+		.array(
+			z.object({
+				email: z.string().email(),
+				personalMessage: z.string().max(500).optional(),
+			}),
+		)
+		.min(1)
+		.max(50),
+	expiresInDays: z.number().int().min(1).max(30).default(7),
 });
 
-const createBatchInvitationsSchema = z.object({
-	type: z.enum(["GROUP", "DISCUSSION"]),
-	targetId: z.string().cuid(),
-	recipientEmails: z.array(z.string().email()).min(1).max(50),
-	message: z.string().max(500).optional(),
-	expiresIn: z.number().min(1).max(30).default(7),
+const createLinkSchema = z.object({
+	discussionId: z.string().cuid(),
+	expiresInDays: z.number().int().min(1).max(30).default(7),
+	maxUses: z.number().int().min(1).max(100).optional(),
 });
 
 const acceptInvitationSchema = z.object({
-	token: z.string(),
+	token: z.string().cuid(),
+	createAccount: z
+		.object({
+			name: z.string().min(1).max(100),
+			email: z.string().email(),
+		})
+		.optional(),
 });
 
-// Helper to check permission to invite
-async function checkInvitePermission(
+const listInvitationsSchema = z.object({
+	discussionId: z.string().cuid().optional(),
+	status: z
+		.enum(["PENDING", "ACCEPTED", "DECLINED", "EXPIRED", "CANCELLED"])
+		.optional(),
+	limit: z.number().int().min(1).max(100).default(20),
+	cursor: z.string().optional(),
+});
+
+// Helper functions
+function formatInvitationOutput(invitation: any) {
+	return {
+		id: invitation.id,
+		type: invitation.type,
+		targetId: invitation.targetId,
+		recipientEmail: invitation.recipientEmail,
+		recipientId: invitation.recipientId,
+		senderId: invitation.senderId,
+		sender: invitation.sender,
+		message: invitation.message,
+		token: invitation.token,
+		status: invitation.status,
+		expiresAt: invitation.expiresAt,
+		acceptedAt: invitation.acceptedAt,
+		declinedAt: invitation.declinedAt,
+		createdAt: invitation.createdAt,
+		discussion: invitation.discussion,
+	};
+}
+
+async function checkDiscussionPermission(
 	db: any,
 	userId: string,
-	type: InvitationType,
-	targetId: string,
+	discussionId: string,
 ) {
-	if (type === "GROUP") {
-		// Check if user is owner or admin of the group
-		const membership = await db.groupMember.findFirst({
-			where: {
-				groupId: targetId,
-				userId,
-				role: { in: ["OWNER", "ADMIN"] },
-				status: "ACTIVE",
-			},
-		});
-
-		if (!membership) {
-			throw new TRPCError({
-				code: "FORBIDDEN",
-				message: "You don't have permission to invite to this group",
-			});
-		}
-
-		// Get group info for validation
-		const group = await db.group.findUnique({
-			where: { id: targetId },
-			select: {
-				name: true,
-				isActive: true,
-				maxMembers: true,
-				_count: {
-					select: {
-						members: {
-							where: { status: "ACTIVE" },
-						},
-					},
-				},
-			},
-		});
-
-		if (!group) {
-			throw new TRPCError({
-				code: "NOT_FOUND",
-				message: "Group not found",
-			});
-		}
-
-		if (!group.isActive) {
-			throw new TRPCError({
-				code: "PRECONDITION_FAILED",
-				message: "Group is not active",
-			});
-		}
-
-		return group;
-	}
 	// Check if user is creator or moderator of the discussion
 	const participant = await db.discussionParticipant.findFirst({
 		where: {
-			discussionId: targetId,
+			discussionId,
 			userId,
 			role: { in: ["CREATOR", "MODERATOR"] },
 			status: "ACTIVE",
@@ -106,11 +94,19 @@ async function checkInvitePermission(
 
 	// Get discussion info for validation
 	const discussion = await db.discussion.findUnique({
-		where: { id: targetId },
+		where: { id: discussionId },
 		select: {
+			id: true,
 			name: true,
+			description: true,
 			isActive: true,
 			maxParticipants: true,
+			lesson: {
+				select: {
+					title: true,
+					description: true,
+				},
+			},
 			_count: {
 				select: {
 					participants: {
@@ -139,216 +135,219 @@ async function checkInvitePermission(
 }
 
 export const invitationRouter = createTRPCRouter({
-	// Create a single invitation
-	create: protectedProcedure
-		.input(createInvitationSchema)
+	// Send email invitations to multiple recipients
+	sendInvitations: protectedProcedure
+		.input(sendInvitationsSchema)
 		.mutation(async ({ ctx, input }) => {
-			// Check permission and get target info
-			const target = await checkInvitePermission(
+			// Check permissions and get discussion info
+			const discussion = await checkDiscussionPermission(
 				ctx.db,
 				ctx.session.user.id,
-				input.type as InvitationType,
-				input.targetId,
+				input.discussionId,
 			);
 
-			// Check for existing user with this email
-			const existingUser = await ctx.db.user.findUnique({
-				where: { email: input.recipientEmail },
-				select: { id: true },
-			});
-
-			// Check for existing pending invitation
-			const existingInvite = await ctx.db.invitation.findFirst({
-				where: {
-					type: input.type,
-					targetId: input.targetId,
-					recipientEmail: input.recipientEmail,
-					status: "PENDING",
-					expiresAt: { gt: new Date() },
-				},
-			});
-
-			if (existingInvite) {
+			// Check available slots
+			const availableSlots =
+				discussion.maxParticipants - discussion._count.participants;
+			if (input.invitations.length > availableSlots) {
 				throw new TRPCError({
-					code: "CONFLICT",
-					message: "An invitation already exists for this email",
+					code: "PRECONDITION_FAILED",
+					message: `Only ${availableSlots} slots available in this discussion`,
 				});
 			}
 
-			// Check if user is already a member
-			if (existingUser) {
-				if (input.type === "GROUP") {
-					const existingMember = await ctx.db.groupMember.findFirst({
+			const expiresAt = new Date();
+			expiresAt.setDate(expiresAt.getDate() + input.expiresInDays);
+
+			const results: Array<{
+				email: string;
+				invitationId: string;
+				status: "sent" | "failed";
+				error?: string;
+			}> = [];
+
+			// Process each invitation
+			for (const inviteData of input.invitations) {
+				try {
+					// Check for existing user
+					const existingUser = await ctx.db.user.findUnique({
+						where: { email: inviteData.email },
+						select: { id: true },
+					});
+
+					// Check for existing pending invitation
+					const existingInvite = await ctx.db.invitation.findFirst({
 						where: {
-							groupId: input.targetId,
-							userId: existingUser.id,
-							status: "ACTIVE",
+							type: "DISCUSSION",
+							targetId: input.discussionId,
+							recipientEmail: inviteData.email,
+							status: "PENDING",
+							expiresAt: { gt: new Date() },
 						},
 					});
 
-					if (existingMember) {
-						throw new TRPCError({
-							code: "CONFLICT",
-							message: "User is already a member of this group",
+					if (existingInvite) {
+						results.push({
+							email: inviteData.email,
+							invitationId: existingInvite.id,
+							status: "failed",
+							error: "Pending invitation already exists",
 						});
+						continue;
 					}
-				} else {
-					const existingParticipant =
-						await ctx.db.discussionParticipant.findFirst({
-							where: {
-								discussionId: input.targetId,
-								userId: existingUser.id,
-								status: "ACTIVE",
-							},
+
+					// Check if user is already a participant
+					if (existingUser) {
+						const existingParticipant =
+							await ctx.db.discussionParticipant.findFirst({
+								where: {
+									discussionId: input.discussionId,
+									userId: existingUser.id,
+									status: "ACTIVE",
+								},
+							});
+
+						if (existingParticipant) {
+							results.push({
+								email: inviteData.email,
+								invitationId: "",
+								status: "failed",
+								error: "User is already a participant",
+							});
+							continue;
+						}
+					}
+
+					// Create invitation
+					const invitation = await ctx.db.invitation.create({
+						data: {
+							type: "DISCUSSION",
+							targetId: input.discussionId,
+							recipientEmail: inviteData.email,
+							recipientId: existingUser?.id,
+							senderId: ctx.session.user.id,
+							message: inviteData.personalMessage,
+							status: "PENDING" as InvitationStatus,
+							expiresAt,
+						},
+					});
+
+					// Send email
+					try {
+						await emailService.sendSingleInvitation({
+							invitationId: invitation.id,
+							recipientEmail: inviteData.email,
+							senderName: ctx.session.user.name || "A discussion creator",
+							discussionName: discussion.name,
+							lessonTitle: discussion.lesson?.title,
+							message: inviteData.personalMessage,
+							joinUrl: `${process.env.NEXTAUTH_URL}/invitations/${invitation.token}`,
+							expiresAt,
 						});
 
-					if (existingParticipant) {
-						throw new TRPCError({
-							code: "CONFLICT",
-							message: "User is already a participant in this discussion",
+						results.push({
+							email: inviteData.email,
+							invitationId: invitation.id,
+							status: "sent",
+						});
+					} catch (emailError) {
+						// Mark invitation as failed but keep the record
+						await ctx.db.invitation.update({
+							where: { id: invitation.id },
+							data: { status: "CANCELLED" },
+						});
+
+						results.push({
+							email: inviteData.email,
+							invitationId: invitation.id,
+							status: "failed",
+							error: "Failed to send email",
 						});
 					}
+				} catch (error) {
+					results.push({
+						email: inviteData.email,
+						invitationId: "",
+						status: "failed",
+						error: "Database error",
+					});
 				}
 			}
 
-			// Create invitation
-			const invitation = await ctx.db.invitation.create({
-				data: {
-					type: input.type as InvitationType,
-					targetId: input.targetId,
-					recipientEmail: input.recipientEmail,
-					recipientId: existingUser?.id,
-					senderId: ctx.session.user.id,
-					message: input.message,
-					status: "PENDING" as InvitationStatus,
-					expiresAt: new Date(
-						Date.now() + input.expiresIn * 24 * 60 * 60 * 1000,
-					),
-				},
-				include: {
-					sender: {
-						select: {
-							name: true,
-							email: true,
-						},
-					},
-				},
-			});
-
-			// TODO: Send email notification
-			// await sendInvitationEmail(invitation);
-
-			return invitation;
-		}),
-
-	// Create batch invitations
-	createBatch: protectedProcedure
-		.input(createBatchInvitationsSchema)
-		.mutation(async ({ ctx, input }) => {
-			// Check permission and get target info
-			const target = await checkInvitePermission(
-				ctx.db,
-				ctx.session.user.id,
-				input.type as InvitationType,
-				input.targetId,
-			);
-
-			// Check capacity
-			const maxCapacity =
-				input.type === "GROUP"
-					? (target as any).maxMembers
-					: (target as any).maxParticipants;
-			const currentCount =
-				(target as any)._count.members || (target as any)._count.participants;
-			const availableSlots = maxCapacity - currentCount;
-
-			if (input.recipientEmails.length > availableSlots) {
-				throw new TRPCError({
-					code: "PRECONDITION_FAILED",
-					message: `Only ${availableSlots} slots available`,
-				});
-			}
-
-			// Get existing users
-			const existingUsers = await ctx.db.user.findMany({
-				where: {
-					email: { in: input.recipientEmails },
-				},
-				select: {
-					id: true,
-					email: true,
-				},
-			});
-
-			const userMap = new Map(existingUsers.map((u) => [u.email, u.id]));
-
-			// Check for existing invitations and memberships
-			const existingInvites = await ctx.db.invitation.findMany({
-				where: {
-					type: input.type,
-					targetId: input.targetId,
-					recipientEmail: { in: input.recipientEmails },
-					status: "PENDING",
-					expiresAt: { gt: new Date() },
-				},
-				select: { recipientEmail: true },
-			});
-
-			const existingInviteEmails = new Set(
-				existingInvites.map((i) => i.recipientEmail),
-			);
-
-			// Filter out emails that already have invitations
-			const validEmails = input.recipientEmails.filter(
-				(email) => !existingInviteEmails.has(email),
-			);
-
-			if (validEmails.length === 0) {
-				throw new TRPCError({
-					code: "CONFLICT",
-					message: "All recipients already have pending invitations",
-				});
-			}
-
-			// Create invitations
-			const expiresAt = new Date(
-				Date.now() + input.expiresIn * 24 * 60 * 60 * 1000,
-			);
-			const invitations = await ctx.db.invitation.createMany({
-				data: validEmails.map((email) => ({
-					type: input.type as InvitationType,
-					targetId: input.targetId,
-					recipientEmail: email,
-					recipientId: userMap.get(email) || null,
-					senderId: ctx.session.user.id,
-					message: input.message,
-					status: "PENDING" as InvitationStatus,
-					expiresAt,
-				})),
-			});
-
-			// TODO: Send batch email notifications
-			// await sendBatchInvitationEmails(invitations);
+			const totalSent = results.filter((r) => r.status === "sent").length;
+			const totalFailed = results.filter((r) => r.status === "failed").length;
 
 			return {
-				sent: invitations.count,
-				skipped: input.recipientEmails.length - invitations.count,
+				sent: results,
+				totalSent,
+				totalFailed,
 			};
 		}),
 
-	// Get invitation by token
-	getByToken: protectedProcedure
-		.input(z.string())
+	// Create a shareable invitation link
+	createLink: protectedProcedure
+		.input(createLinkSchema)
+		.mutation(async ({ ctx, input }) => {
+			// Check permissions and get discussion info
+			const discussion = await checkDiscussionPermission(
+				ctx.db,
+				ctx.session.user.id,
+				input.discussionId,
+			);
+
+			const expiresAt = new Date();
+			expiresAt.setDate(expiresAt.getDate() + input.expiresInDays);
+
+			// Create link invitation
+			const invitation = await ctx.db.invitation.create({
+				data: {
+					type: "DISCUSSION",
+					targetId: input.discussionId,
+					recipientEmail: "", // Empty for link-based invitations
+					senderId: ctx.session.user.id,
+					status: "PENDING" as InvitationStatus,
+					expiresAt,
+					maxUses: input.maxUses,
+					isLink: true,
+				},
+			});
+
+			const url = `${process.env.NEXTAUTH_URL}/invitations/${invitation.token}`;
+
+			return {
+				url,
+				token: invitation.token,
+				expiresAt,
+				maxUses: input.maxUses || null,
+				currentUses: 0,
+			};
+		}),
+
+	// Get invitation details by token (public for non-authenticated access)
+	getByToken: publicProcedure
+		.input(z.object({ token: z.string().cuid() }))
 		.query(async ({ ctx, input }) => {
 			const invitation = await ctx.db.invitation.findUnique({
-				where: { token: input },
+				where: { token: input.token },
 				include: {
 					sender: {
 						select: {
 							id: true,
 							name: true,
 							email: true,
-							image: true,
+						},
+					},
+					discussion: {
+						select: {
+							id: true,
+							name: true,
+							description: true,
+							lesson: {
+								select: {
+									title: true,
+									description: true,
+								},
+							},
 						},
 					},
 				},
@@ -358,14 +357,6 @@ export const invitationRouter = createTRPCRouter({
 				throw new TRPCError({
 					code: "NOT_FOUND",
 					message: "Invitation not found",
-				});
-			}
-
-			// Check if invitation is for current user
-			if (invitation.recipientEmail !== ctx.session.user.email) {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "This invitation is not for you",
 				});
 			}
 
@@ -384,60 +375,32 @@ export const invitationRouter = createTRPCRouter({
 				});
 			}
 
-			// Get target details
-			let targetDetails;
-			if (invitation.type === "GROUP") {
-				targetDetails = await ctx.db.group.findUnique({
-					where: { id: invitation.targetId },
-					select: {
-						id: true,
-						name: true,
-						description: true,
-						_count: {
-							select: {
-								members: {
-									where: { status: "ACTIVE" },
-								},
-							},
-						},
-					},
-				});
-			} else {
-				targetDetails = await ctx.db.discussion.findUnique({
-					where: { id: invitation.targetId },
-					select: {
-						id: true,
-						name: true,
-						description: true,
-						lesson: {
-							select: {
-								title: true,
-								objectives: true,
-							},
-						},
-						_count: {
-							select: {
-								participants: {
-									where: { status: "ACTIVE" },
-								},
-							},
-						},
-					},
-				});
-			}
-
-			return {
-				...invitation,
-				targetDetails,
-			};
+			return formatInvitationOutput(invitation);
 		}),
 
-	// Accept invitation
+	// Accept an invitation
 	accept: protectedProcedure
 		.input(acceptInvitationSchema)
 		.mutation(async ({ ctx, input }) => {
 			const invitation = await ctx.db.invitation.findUnique({
 				where: { token: input.token },
+				include: {
+					discussion: {
+						select: {
+							id: true,
+							name: true,
+							isActive: true,
+							maxParticipants: true,
+							_count: {
+								select: {
+									participants: {
+										where: { status: "ACTIVE" },
+									},
+								},
+							},
+						},
+					},
+				},
 			});
 
 			if (!invitation) {
@@ -447,11 +410,14 @@ export const invitationRouter = createTRPCRouter({
 				});
 			}
 
-			// Verify invitation is for current user
-			if (invitation.recipientEmail !== ctx.session.user.email) {
+			// Check if this is an email-based invitation
+			if (
+				!invitation.isLink &&
+				invitation.recipientEmail !== ctx.session.user.email
+			) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "This invitation is not for you",
+					message: "This invitation is not for your email address",
 				});
 			}
 
@@ -475,89 +441,102 @@ export const invitationRouter = createTRPCRouter({
 				});
 			}
 
-			// Add user to group or discussion
-			if (invitation.type === "GROUP") {
-				// Check if already a member
-				const existingMember = await ctx.db.groupMember.findFirst({
-					where: {
-						groupId: invitation.targetId,
+			// Check discussion capacity
+			if (
+				invitation.discussion!._count.participants >=
+				invitation.discussion!.maxParticipants
+			) {
+				throw new TRPCError({
+					code: "PRECONDITION_FAILED",
+					message: "Discussion is full",
+				});
+			}
+
+			// Check if user is already a participant
+			const existingParticipant = await ctx.db.discussionParticipant.findFirst({
+				where: {
+					discussionId: invitation.targetId,
+					userId: ctx.session.user.id,
+				},
+			});
+
+			let accountCreated = false;
+
+			// Handle account creation if needed
+			if (input.createAccount) {
+				// This would be for future use when we support guest accounts
+				accountCreated = false; // For now, always false since we use Discord auth
+			}
+
+			// Add user as participant or reactivate
+			if (!existingParticipant) {
+				await ctx.db.discussionParticipant.create({
+					data: {
+						discussionId: invitation.targetId,
 						userId: ctx.session.user.id,
+						role: "PARTICIPANT" as ParticipantRole,
+						status: "ACTIVE",
 					},
 				});
-
-				if (!existingMember) {
-					await ctx.db.groupMember.create({
-						data: {
-							groupId: invitation.targetId,
-							userId: ctx.session.user.id,
-							role: "MEMBER" as GroupRole,
-							status: "ACTIVE",
-						},
-					});
-				} else if (existingMember.status !== "ACTIVE") {
-					// Reactivate membership
-					await ctx.db.groupMember.update({
-						where: { id: existingMember.id },
-						data: {
-							status: "ACTIVE",
-							leftAt: null,
-						},
-					});
-				}
-			} else {
-				// Check if already a participant
-				const existingParticipant =
-					await ctx.db.discussionParticipant.findFirst({
-						where: {
-							discussionId: invitation.targetId,
-							userId: ctx.session.user.id,
-						},
-					});
-
-				if (!existingParticipant) {
-					await ctx.db.discussionParticipant.create({
-						data: {
-							discussionId: invitation.targetId,
-							userId: ctx.session.user.id,
-							role: "PARTICIPANT" as ParticipantRole,
-							status: "ACTIVE",
-						},
-					});
-				} else if (existingParticipant.status !== "ACTIVE") {
-					// Reactivate participation
-					await ctx.db.discussionParticipant.update({
-						where: { id: existingParticipant.id },
-						data: {
-							status: "ACTIVE",
-							leftAt: null,
-						},
-					});
-				}
+			} else if (existingParticipant.status !== "ACTIVE") {
+				await ctx.db.discussionParticipant.update({
+					where: { id: existingParticipant.id },
+					data: {
+						status: "ACTIVE",
+						leftAt: null,
+					},
+				});
 			}
 
 			// Update invitation status
-			const updatedInvitation = await ctx.db.invitation.update({
+			await ctx.db.invitation.update({
 				where: { id: invitation.id },
 				data: {
 					status: "ACCEPTED" as InvitationStatus,
 					acceptedAt: new Date(),
 					recipientId: ctx.session.user.id,
+					...(invitation.isLink && { usageCount: { increment: 1 } }),
 				},
 			});
 
+			// Create system message
+			await ctx.db.message.create({
+				data: {
+					discussionId: invitation.targetId,
+					content: `${ctx.session.user.name || "A participant"} joined the discussion`,
+					type: "SYSTEM",
+				},
+			});
+
+			// Broadcast to WebSocket if available
+			const wsService = getWebSocketService();
+			if (wsService) {
+				wsService.broadcastToDiscussion(invitation.targetId, {
+					type: "user_joined",
+					discussionId: invitation.targetId,
+					data: {
+						user: { id: ctx.session.user.id, name: ctx.session.user.name },
+					},
+					timestamp: Date.now(),
+				});
+			}
+
 			return {
-				accepted: true,
-				type: invitation.type,
-				targetId: invitation.targetId,
+				discussion: {
+					id: invitation.discussion!.id,
+					name: invitation.discussion!.name,
+				},
+				userId: ctx.session.user.id,
+				accountCreated,
 			};
 		}),
 
-	// Decline invitation
+	// Decline an invitation
 	decline: protectedProcedure
-		.input(z.string())
+		.input(z.object({ token: z.string().cuid() }))
 		.mutation(async ({ ctx, input }) => {
 			const invitation = await ctx.db.invitation.findUnique({
-				where: { token: input },
+				where: { token: input.token },
 			});
 
 			if (!invitation) {
@@ -567,11 +546,14 @@ export const invitationRouter = createTRPCRouter({
 				});
 			}
 
-			// Verify invitation is for current user
-			if (invitation.recipientEmail !== ctx.session.user.email) {
+			// Check if this is an email-based invitation
+			if (
+				!invitation.isLink &&
+				invitation.recipientEmail !== ctx.session.user.email
+			) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "This invitation is not for you",
+					message: "This invitation is not for your email address",
 				});
 			}
 
@@ -592,15 +574,15 @@ export const invitationRouter = createTRPCRouter({
 				},
 			});
 
-			return { declined: true };
+			return { success: true };
 		}),
 
-	// Cancel invitation (for sender)
+	// Cancel a pending invitation (sender only)
 	cancel: protectedProcedure
-		.input(z.string().cuid())
+		.input(z.object({ invitationId: z.string().cuid() }))
 		.mutation(async ({ ctx, input }) => {
 			const invitation = await ctx.db.invitation.findUnique({
-				where: { id: input },
+				where: { id: input.invitationId },
 			});
 
 			if (!invitation) {
@@ -634,126 +616,213 @@ export const invitationRouter = createTRPCRouter({
 				},
 			});
 
-			return { cancelled: true };
+			return { success: true };
 		}),
 
-	// List sent invitations
-	listSent: protectedProcedure
-		.input(
-			z.object({
-				type: z.enum(["GROUP", "DISCUSSION"]).optional(),
-				status: z
-					.enum(["PENDING", "ACCEPTED", "DECLINED", "EXPIRED", "CANCELLED"])
-					.optional(),
-				limit: z.number().min(1).max(100).default(20),
-				offset: z.number().min(0).default(0),
-			}),
-		)
-		.query(async ({ ctx, input }) => {
-			const where = {
-				senderId: ctx.session.user.id,
-				...(input.type && { type: input.type }),
-				...(input.status && { status: input.status }),
-			};
-
-			const [invitations, total] = await Promise.all([
-				ctx.db.invitation.findMany({
-					where,
-					take: input.limit,
-					skip: input.offset,
-					orderBy: { createdAt: "desc" },
-					include: {
-						recipient: {
-							select: {
-								id: true,
-								name: true,
-								email: true,
-								image: true,
+	// Resend an invitation email
+	resend: protectedProcedure
+		.input(z.object({ invitationId: z.string().cuid() }))
+		.mutation(async ({ ctx, input }) => {
+			const invitation = await ctx.db.invitation.findUnique({
+				where: { id: input.invitationId },
+				include: {
+					discussion: {
+						select: {
+							name: true,
+							lesson: {
+								select: {
+									title: true,
+								},
 							},
 						},
 					},
-				}),
-				ctx.db.invitation.count({ where }),
-			]);
+				},
+			});
 
-			return {
-				invitations,
-				total,
-				hasMore: input.offset + input.limit < total,
-			};
+			if (!invitation) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Invitation not found",
+				});
+			}
+
+			// Check if user is the sender
+			if (invitation.senderId !== ctx.session.user.id) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "You can only resend invitations you sent",
+				});
+			}
+
+			// Check status
+			if (invitation.status !== "PENDING") {
+				throw new TRPCError({
+					code: "PRECONDITION_FAILED",
+					message: "Can only resend pending invitations",
+				});
+			}
+
+			// Check if expired
+			if (invitation.expiresAt < new Date()) {
+				throw new TRPCError({
+					code: "PRECONDITION_FAILED",
+					message: "Cannot resend expired invitation",
+				});
+			}
+
+			// Resend email
+			await emailService.resendInvitation({
+				invitationId: invitation.id,
+				recipientEmail: invitation.recipientEmail,
+				senderName: ctx.session.user.name || "A discussion creator",
+				discussionName: invitation.discussion!.name,
+				lessonTitle: invitation.discussion!.lesson?.title,
+				message: invitation.message,
+				joinUrl: `${process.env.NEXTAUTH_URL}/invitations/${invitation.token}`,
+				expiresAt: invitation.expiresAt,
+			});
+
+			return { success: true };
 		}),
 
-	// List received invitations
-	listReceived: protectedProcedure
-		.input(
-			z.object({
-				type: z.enum(["GROUP", "DISCUSSION"]).optional(),
-				status: z
-					.enum(["PENDING", "ACCEPTED", "DECLINED", "EXPIRED", "CANCELLED"])
-					.optional(),
-				limit: z.number().min(1).max(100).default(20),
-				offset: z.number().min(0).default(0),
-			}),
-		)
+	// List invitations for a discussion
+	list: protectedProcedure
+		.input(listInvitationsSchema)
 		.query(async ({ ctx, input }) => {
-			const where = {
-				recipientEmail: ctx.session.user.email!,
-				...(input.type && { type: input.type }),
-				...(input.status && { status: input.status }),
-			};
+			const where: any = {};
 
-			const [invitations, total] = await Promise.all([
-				ctx.db.invitation.findMany({
-					where,
-					take: input.limit,
-					skip: input.offset,
-					orderBy: { createdAt: "desc" },
-					include: {
-						sender: {
-							select: {
-								id: true,
-								name: true,
-								email: true,
-								image: true,
+			if (input.discussionId) {
+				// Check if user has permission to view invitations for this discussion
+				await checkDiscussionPermission(
+					ctx.db,
+					ctx.session.user.id,
+					input.discussionId,
+				);
+				where.targetId = input.discussionId;
+				where.type = "DISCUSSION";
+			} else {
+				// Show invitations sent by this user
+				where.senderId = ctx.session.user.id;
+			}
+
+			if (input.status) {
+				where.status = input.status;
+			}
+
+			if (input.cursor) {
+				where.id = { lt: input.cursor };
+			}
+
+			const invitations = await ctx.db.invitation.findMany({
+				where,
+				take: input.limit + 1, // Take one extra to check if there are more
+				orderBy: { createdAt: "desc" },
+				include: {
+					sender: {
+						select: {
+							id: true,
+							name: true,
+							email: true,
+						},
+					},
+					discussion: {
+						select: {
+							id: true,
+							name: true,
+							description: true,
+							lesson: {
+								select: {
+									title: true,
+									description: true,
+								},
 							},
 						},
 					},
-				}),
-				ctx.db.invitation.count({ where }),
-			]);
+				},
+			});
 
-			// Get target details for each invitation
-			const invitationsWithDetails = await Promise.all(
-				invitations.map(async (invitation) => {
-					let targetDetails;
-					if (invitation.type === "GROUP") {
-						targetDetails = await ctx.db.group.findUnique({
-							where: { id: invitation.targetId },
-							select: {
-								name: true,
-								description: true,
-							},
-						});
-					} else {
-						targetDetails = await ctx.db.discussion.findUnique({
-							where: { id: invitation.targetId },
-							select: {
-								name: true,
-								description: true,
-							},
-						});
-					}
-					return {
-						...invitation,
-						targetDetails,
-					};
-				}),
-			);
+			let hasMore = false;
+			if (invitations.length > input.limit) {
+				invitations.pop();
+				hasMore = true;
+			}
 
 			return {
-				invitations: invitationsWithDetails,
-				total,
-				hasMore: input.offset + input.limit < total,
+				invitations: invitations.map(formatInvitationOutput),
+				nextCursor: invitations[invitations.length - 1]?.id,
+				hasMore,
+			};
+		}),
+
+	// Check if an invitation is valid
+	validate: publicProcedure
+		.input(z.object({ token: z.string().cuid() }))
+		.query(async ({ ctx, input }) => {
+			const invitation = await ctx.db.invitation.findUnique({
+				where: { token: input.token },
+				include: {
+					discussion: {
+						select: {
+							id: true,
+							name: true,
+							isActive: true,
+							maxParticipants: true,
+							_count: {
+								select: {
+									participants: {
+										where: { status: "ACTIVE" },
+									},
+								},
+							},
+						},
+					},
+				},
+			});
+
+			if (!invitation) {
+				return {
+					valid: false,
+					reason: "Invitation not found",
+				};
+			}
+
+			if (invitation.status !== "PENDING") {
+				return {
+					valid: false,
+					reason: `Invitation is ${invitation.status.toLowerCase()}`,
+				};
+			}
+
+			if (invitation.expiresAt < new Date()) {
+				return {
+					valid: false,
+					reason: "Invitation has expired",
+				};
+			}
+
+			if (!invitation.discussion?.isActive) {
+				return {
+					valid: false,
+					reason: "Discussion is not active",
+				};
+			}
+
+			const participantCount = invitation.discussion._count.participants;
+			if (participantCount >= invitation.discussion.maxParticipants) {
+				return {
+					valid: false,
+					reason: "Discussion is full",
+				};
+			}
+
+			return {
+				valid: true,
+				discussion: {
+					id: invitation.discussion.id,
+					name: invitation.discussion.name,
+					participantCount,
+					maxParticipants: invitation.discussion.maxParticipants,
+				},
 			};
 		}),
 });

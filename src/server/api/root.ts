@@ -4,6 +4,7 @@ import { discussionRouter } from "@/server/api/routers/discussion";
 import { groupRouter } from "@/server/api/routers/group";
 import { invitationRouter } from "@/server/api/routers/invitation";
 import { lessonRouter } from "@/server/api/routers/lesson";
+import { messageRouter } from "@/server/api/routers/message";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 
 /**
@@ -17,6 +18,7 @@ export const appRouter = createTRPCRouter({
 	group: groupRouter,
 	discussion: discussionRouter,
 	invitation: invitationRouter,
+	message: messageRouter,
 	dashboard: dashboardRouter,
 });
 

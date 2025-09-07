@@ -36,57 +36,57 @@
 - All paths relative to repository root
 
 ## Phase 3.1: Setup
-- [ ] T001 Install dependencies: resend, @react-email/components, openai, ws
-- [ ] T002 Add environment variables to .env.local: RESEND_API_KEY, OPENAI_API_KEY, WS_PORT
-- [ ] T003 [P] Create discussion UI directory structure at src/app/discussions/
-- [ ] T004 [P] Create service directories at src/server/services/
+- [x] T001 Install dependencies: resend, @react-email/components, openai, ws
+- [x] T002 Add environment variables to .env.local: RESEND_API_KEY, OPENAI_API_KEY, WS_PORT
+- [x] T003 [P] Create discussion UI directory structure at src/app/discussions/
+- [x] T004 [P] Create service directories at src/server/services/
 
 ## Phase 3.2: Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.3
 
 ### Contract Tests (Must Fail Initially)
-- [ ] T005 [P] Create discussion router contract tests at tests/discussion/discussion.test.ts
-- [ ] T006 [P] Create invitation router contract tests at tests/invitation/invitation.test.ts  
-- [ ] T007 [P] Create message router contract tests at tests/message/message.test.ts
-- [ ] T008 Run tests and verify all fail with "router not implemented"
+- [x] T005 [P] Create discussion router contract tests at tests/discussion/discussion.test.ts
+- [x] T006 [P] Create invitation router contract tests at tests/invitation/invitation.test.ts  
+- [x] T007 [P] Create message router contract tests at tests/message/message.test.ts
+- [x] T008 Run tests and verify all fail with "router not implemented"
 
 ### Integration Tests (Must Fail Initially)
-- [ ] T009 [P] Create discussion creation flow test at tests/integration/create-discussion.test.ts
-- [ ] T010 [P] Create invitation acceptance flow test at tests/integration/accept-invitation.test.ts
-- [ ] T011 [P] Create real-time messaging flow test at tests/integration/messaging.test.ts
-- [ ] T012 [P] Create AI facilitation flow test at tests/integration/ai-facilitation.test.ts
-- [ ] T013 Run integration tests and verify all fail
+- [x] T009 [P] Create discussion creation flow test at tests/integration/create-discussion.test.ts
+- [x] T010 [P] Create invitation acceptance flow test at tests/integration/accept-invitation.test.ts
+- [x] T011 [P] Create real-time messaging flow test at tests/integration/messaging.test.ts
+- [x] T012 [P] Create AI facilitation flow test at tests/integration/ai-facilitation.test.ts
+- [x] T013 Run integration tests and verify all fail
 
 ### E2E Tests (Must Fail Initially)
-- [ ] T014 Create E2E test for complete discussion lifecycle at tests/e2e/discussion.e2e.ts
-- [ ] T015 Run E2E test and verify it fails
+- [x] T014 Create E2E test for complete discussion lifecycle at tests/e2e/discussion.e2e.ts
+- [x] T015 Run E2E test and verify it fails
 
 ## Phase 3.3: Core Implementation
 
 ### Services Layer
-- [ ] T016 [P] Implement email service at src/server/services/email.ts using Resend
-- [ ] T017 [P] Implement AI facilitator service at src/server/services/ai-facilitator.ts using OpenAI
-- [ ] T018 Implement WebSocket service at src/server/services/websocket.ts for real-time updates
+- [x] T016 [P] Implement email service at src/server/services/email.ts using Resend
+- [x] T017 [P] Implement AI facilitator service at src/server/services/ai-facilitator.ts using OpenAI
+- [x] T018 Implement WebSocket service at src/server/services/websocket.ts for real-time updates
 
 ### tRPC Routers
-- [ ] T019 Implement discussion router at src/server/api/routers/discussion.ts with all endpoints
-- [ ] T020 Implement invitation router at src/server/api/routers/invitation.ts with all endpoints
-- [ ] T021 Implement message router at src/server/api/routers/message.ts with all endpoints
-- [ ] T022 Update root router at src/server/api/root.ts to include new routers
-- [ ] T023 Run contract tests - they should now pass
+- [x] T019 Implement discussion router at src/server/api/routers/discussion.ts with all endpoints
+- [x] T020 Implement invitation router at src/server/api/routers/invitation.ts with all endpoints
+- [x] T021 Implement message router at src/server/api/routers/message.ts with all endpoints
+- [x] T022 Update root router at src/server/api/root.ts to include new routers
+- [x] T023 Run contract tests - they should now pass
 
 ### UI Components
-- [ ] T024 [P] Create discussion list component at src/app/discussions/_components/discussion-list.tsx
-- [ ] T025 [P] Create create discussion form at src/app/discussions/_components/create-discussion-form.tsx
-- [ ] T026 [P] Create invitation modal at src/app/discussions/_components/invite-participants-modal.tsx
-- [ ] T027 Create discussion page at src/app/discussions/page.tsx
-- [ ] T028 Create individual discussion view at src/app/discussions/[id]/page.tsx
-- [ ] T029 [P] Create message list component at src/app/discussions/[id]/_components/message-list.tsx
-- [ ] T030 [P] Create message input component at src/app/discussions/[id]/_components/message-input.tsx
-- [ ] T031 Update navigation at src/app/_components/sidebar.tsx to include Discussions link
+- [x] T024 [P] Create discussion list component at src/app/discussions/_components/discussion-list.tsx
+- [x] T025 [P] Create create discussion form at src/app/discussions/_components/create-discussion-form.tsx
+- [x] T026 [P] Create invitation modal at src/app/discussions/_components/invite-participants-modal.tsx
+- [x] T027 Create discussion page at src/app/discussions/page.tsx
+- [x] T028 Create individual discussion view at src/app/discussions/[id]/page.tsx
+- [x] T029 [P] Create message list component at src/app/discussions/[id]/_components/message-list.tsx
+- [x] T030 [P] Create message input component at src/app/discussions/[id]/_components/message-input.tsx
+- [x] T031 Update navigation at src/components/app-sidebar.tsx to include Discussions link (already included)
 
 ## Phase 3.4: Integration & Polish
 - [ ] T032 Integrate WebSocket subscriptions in message components for real-time updates
-- [ ] T033 Add error handling and loading states to all UI components
+- [x] T033 Add error handling and loading states to all UI components
 - [ ] T034 Run all integration tests - they should now pass
 - [ ] T035 Run E2E tests - they should now pass
 

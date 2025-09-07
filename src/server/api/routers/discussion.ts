@@ -1,47 +1,57 @@
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import { aiService } from "@/server/services/ai-facilitator";
+import { emailService } from "@/server/services/email";
+import { getWebSocketService } from "@/server/services/websocket";
 import type {
 	MessageType,
 	ParticipantRole,
 	ParticipantStatus,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import bcrypt from "bcryptjs";
 import { z } from "zod";
 
-// Validation schemas
+// Contract-compliant validation schemas
 const createDiscussionSchema = z.object({
+	lessonId: z.string().cuid(),
 	name: z.string().min(1).max(100),
 	description: z.string().optional(),
-	lessonId: z.string().cuid().optional(),
-	maxParticipants: z.number().min(2).max(50).default(20),
+	maxParticipants: z.number().int().min(1).max(1000).default(20),
 	isPublic: z.boolean().default(false),
-	password: z.string().min(6).optional(),
 	scheduledFor: z.date().optional(),
 	expiresAt: z.date().optional(),
-	aiConfig: z.record(z.any()).default({}),
-	systemPrompt: z.string().optional(),
+	aiConfig: z
+		.object({
+			model: z.string().default("gpt-4"),
+			temperature: z.number().min(0).max(2).default(0.7),
+			maxTokens: z.number().int().min(1).max(4000).default(500),
+		})
+		.optional(),
+});
+
+const updateDiscussionSchema = z.object({
+	id: z.string().cuid(),
+	name: z.string().min(1).max(100).optional(),
+	description: z.string().optional(),
+	maxParticipants: z.number().int().min(1).max(1000).optional(),
+	isPublic: z.boolean().optional(),
+	scheduledFor: z.date().optional(),
+	expiresAt: z.date().optional(),
+});
+
+const listDiscussionsSchema = z.object({
+	role: z.enum(["creator", "participant", "all"]).optional(),
+	isActive: z.boolean().optional(),
+	limit: z.number().int().min(1).max(100).default(20),
+	cursor: z.string().optional(),
 });
 
 const joinDiscussionSchema = z.object({
 	discussionId: z.string().cuid().optional(),
-	joinCode: z.string().optional(),
+	joinCode: z.string().length(8).optional(),
 	password: z.string().optional(),
 });
 
-const sendMessageSchema = z.object({
-	discussionId: z.string().cuid(),
-	content: z.string().min(1).max(5000),
-	parentId: z.string().cuid().optional(),
-});
-
-const getMessagesSchema = z.object({
-	discussionId: z.string().cuid(),
-	limit: z.number().min(1).max(100).default(50),
-	cursor: z.string().optional(), // For pagination
-	parentId: z.string().optional(), // For threaded messages
-});
-
-// Helper function to generate join code
+// Helper functions
 function generateJoinCode(): string {
 	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 	let code = "";
@@ -51,34 +61,83 @@ function generateJoinCode(): string {
 	return code;
 }
 
+function formatDiscussionOutput(discussion: any, userRole?: ParticipantRole) {
+	return {
+		id: discussion.id,
+		name: discussion.name,
+		description: discussion.description,
+		creatorId: discussion.creatorId,
+		creator: discussion.creator,
+		lessonId: discussion.lessonId,
+		lesson: discussion.lesson,
+		isActive: discussion.isActive,
+		isPublic: discussion.isPublic,
+		maxParticipants: discussion.maxParticipants,
+		participantCount: discussion._count?.participants || 0,
+		joinCode: discussion.joinCode,
+		hasPassword: !!discussion.password,
+		scheduledFor: discussion.scheduledFor,
+		expiresAt: discussion.expiresAt,
+		createdAt: discussion.createdAt,
+		updatedAt: discussion.updatedAt,
+		closedAt: discussion.closedAt,
+		userRole: userRole || null,
+	};
+}
+
+function formatParticipantOutput(participant: any) {
+	return {
+		id: participant.id,
+		userId: participant.userId,
+		user: participant.user,
+		role: participant.role,
+		status: participant.status,
+		joinedAt: participant.joinedAt,
+		leftAt: participant.leftAt,
+		lastSeenAt: participant.lastSeenAt,
+		messageCount: participant.messageCount,
+	};
+}
+
 export const discussionRouter = createTRPCRouter({
 	// Create a new discussion
 	create: protectedProcedure
 		.input(createDiscussionSchema)
 		.mutation(async ({ ctx, input }) => {
-			let hashedPassword: string | null = null;
-			if (input.password) {
-				hashedPassword = await bcrypt.hash(input.password, 10);
-			}
+			// Get lesson info (lessonId is required in contract)
+			const lesson = await ctx.db.lesson.findUnique({
+				where: { id: input.lessonId },
+				select: {
+					id: true,
+					title: true,
+					description: true,
+					objectives: true,
+					facilitationStyle: true,
+					keyQuestions: true,
+					creatorId: true,
+				},
+			});
 
-			// If a lesson is specified, get its AI config
-			let lessonConfig = {};
-			if (input.lessonId) {
-				const lesson = await ctx.db.lesson.findUnique({
-					where: { id: input.lessonId },
-					select: {
-						facilitationStyle: true,
-						keyQuestions: true,
-					},
+			if (!lesson) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Lesson not found",
 				});
-
-				if (lesson) {
-					lessonConfig = {
-						facilitationStyle: lesson.facilitationStyle,
-						keyQuestions: lesson.keyQuestions,
-					};
-				}
 			}
+
+			// Check if user owns the lesson
+			if (lesson.creatorId !== ctx.session.user.id) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "You can only create discussions from your own lessons",
+				});
+			}
+
+			const lessonConfig = {
+				facilitationStyle: lesson.facilitationStyle,
+				keyQuestions: lesson.keyQuestions,
+				objectives: lesson.objectives,
+			};
 
 			const discussion = await ctx.db.discussion.create({
 				data: {
@@ -88,12 +147,10 @@ export const discussionRouter = createTRPCRouter({
 					lessonId: input.lessonId,
 					maxParticipants: input.maxParticipants,
 					isPublic: input.isPublic,
-					password: hashedPassword,
 					joinCode: generateJoinCode(),
 					scheduledFor: input.scheduledFor,
 					expiresAt: input.expiresAt,
 					aiConfig: { ...lessonConfig, ...input.aiConfig },
-					systemPrompt: input.systemPrompt,
 					participants: {
 						create: {
 							userId: ctx.session.user.id,
@@ -103,21 +160,366 @@ export const discussionRouter = createTRPCRouter({
 					},
 				},
 				include: {
+					creator: {
+						select: {
+							id: true,
+							name: true,
+							email: true,
+							image: true,
+						},
+					},
 					lesson: {
 						select: {
 							id: true,
 							title: true,
+							description: true,
+							objectives: true,
+							facilitationStyle: true,
 						},
 					},
 					_count: {
 						select: {
-							participants: true,
+							participants: {
+								where: { status: "ACTIVE" },
+							},
 						},
 					},
 				},
 			});
 
-			return discussion;
+			return formatDiscussionOutput(discussion, "CREATOR");
+		}),
+
+	// Update discussion details (creator only)
+	update: protectedProcedure
+		.input(updateDiscussionSchema)
+		.mutation(async ({ ctx, input }) => {
+			// Check if user is creator
+			const participant = await ctx.db.discussionParticipant.findUnique({
+				where: {
+					discussionId_userId: {
+						discussionId: input.id,
+						userId: ctx.session.user.id,
+					},
+				},
+			});
+
+			if (!participant || participant.role !== "CREATOR") {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "Only the creator can update discussion details",
+				});
+			}
+
+			const discussion = await ctx.db.discussion.update({
+				where: { id: input.id },
+				data: {
+					name: input.name,
+					description: input.description,
+					maxParticipants: input.maxParticipants,
+					isPublic: input.isPublic,
+					scheduledFor: input.scheduledFor,
+					expiresAt: input.expiresAt,
+				},
+				include: {
+					creator: {
+						select: {
+							id: true,
+							name: true,
+							email: true,
+							image: true,
+						},
+					},
+					lesson: {
+						select: {
+							id: true,
+							title: true,
+							description: true,
+							objectives: true,
+							facilitationStyle: true,
+						},
+					},
+					_count: {
+						select: {
+							participants: {
+								where: { status: "ACTIVE" },
+							},
+						},
+					},
+				},
+			});
+
+			return formatDiscussionOutput(discussion, "CREATOR");
+		}),
+
+	// Close a discussion (creator only)
+	close: protectedProcedure
+		.input(z.object({ id: z.string().cuid() }))
+		.mutation(async ({ ctx, input }) => {
+			// Check if user is creator
+			const participant = await ctx.db.discussionParticipant.findUnique({
+				where: {
+					discussionId_userId: {
+						discussionId: input.id,
+						userId: ctx.session.user.id,
+					},
+				},
+			});
+
+			if (!participant || participant.role !== "CREATOR") {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "Only the creator can close the discussion",
+				});
+			}
+
+			// Close the discussion
+			const discussion = await ctx.db.discussion.update({
+				where: { id: input.id },
+				data: {
+					isActive: false,
+					closedAt: new Date(),
+				},
+				include: {
+					creator: {
+						select: {
+							id: true,
+							name: true,
+							email: true,
+							image: true,
+						},
+					},
+					lesson: {
+						select: {
+							id: true,
+							title: true,
+							description: true,
+							objectives: true,
+							facilitationStyle: true,
+						},
+					},
+					_count: {
+						select: {
+							participants: {
+								where: { status: "ACTIVE" },
+							},
+						},
+					},
+				},
+			});
+
+			// Create closing message
+			await ctx.db.message.create({
+				data: {
+					discussionId: input.id,
+					content: "Discussion has been closed by the creator",
+					type: "SYSTEM" as MessageType,
+				},
+			});
+
+			// Broadcast to WebSocket if available
+			const wsService = getWebSocketService();
+			if (wsService) {
+				wsService.broadcastToDiscussion(input.id, {
+					type: "user_left",
+					discussionId: input.id,
+					data: { closed: true },
+					timestamp: Date.now(),
+				});
+			}
+
+			return formatDiscussionOutput(discussion, "CREATOR");
+		}),
+
+	// Get discussion details
+	getById: protectedProcedure
+		.input(z.object({ id: z.string().cuid() }))
+		.query(async ({ ctx, input }) => {
+			// Check if user is a participant
+			const participant = await ctx.db.discussionParticipant.findUnique({
+				where: {
+					discussionId_userId: {
+						discussionId: input.id,
+						userId: ctx.session.user.id,
+					},
+				},
+			});
+
+			if (!participant) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "You don't have permission to view this discussion",
+				});
+			}
+
+			const discussion = await ctx.db.discussion.findUnique({
+				where: { id: input.id },
+				include: {
+					creator: {
+						select: {
+							id: true,
+							name: true,
+							email: true,
+							image: true,
+						},
+					},
+					lesson: {
+						select: {
+							id: true,
+							title: true,
+							description: true,
+							objectives: true,
+							facilitationStyle: true,
+						},
+					},
+					_count: {
+						select: {
+							participants: {
+								where: { status: "ACTIVE" },
+							},
+						},
+					},
+				},
+			});
+
+			if (!discussion) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Discussion not found",
+				});
+			}
+
+			return formatDiscussionOutput(discussion, participant.role);
+		}),
+
+	// List discussions (filtered by role)
+	list: protectedProcedure
+		.input(listDiscussionsSchema)
+		.query(async ({ ctx, input }) => {
+			const where: any = {};
+
+			if (input.role === "creator") {
+				where.creatorId = ctx.session.user.id;
+			} else if (input.role === "participant") {
+				where.participants = {
+					some: {
+						userId: ctx.session.user.id,
+						status: "ACTIVE",
+						role: { not: "CREATOR" },
+					},
+				};
+			} else {
+				// "all" or undefined - show discussions user is involved in
+				where.participants = {
+					some: {
+						userId: ctx.session.user.id,
+						status: "ACTIVE",
+					},
+				};
+			}
+
+			if (input.isActive !== undefined) {
+				where.isActive = input.isActive;
+			}
+
+			if (input.cursor) {
+				where.id = { lt: input.cursor };
+			}
+
+			const discussions = await ctx.db.discussion.findMany({
+				where,
+				take: input.limit + 1, // Take one extra to check if there are more
+				orderBy: { updatedAt: "desc" },
+				include: {
+					creator: {
+						select: {
+							id: true,
+							name: true,
+							email: true,
+							image: true,
+						},
+					},
+					lesson: {
+						select: {
+							id: true,
+							title: true,
+							description: true,
+							objectives: true,
+							facilitationStyle: true,
+						},
+					},
+					participants: {
+						where: {
+							userId: ctx.session.user.id,
+						},
+						select: {
+							role: true,
+						},
+					},
+					_count: {
+						select: {
+							participants: {
+								where: { status: "ACTIVE" },
+							},
+						},
+					},
+				},
+			});
+
+			let hasMore = false;
+			if (discussions.length > input.limit) {
+				discussions.pop();
+				hasMore = true;
+			}
+
+			const formattedDiscussions = discussions.map((d) =>
+				formatDiscussionOutput(d, d.participants[0]?.role),
+			);
+
+			return {
+				discussions: formattedDiscussions,
+				nextCursor: discussions[discussions.length - 1]?.id,
+				hasMore,
+			};
+		}),
+
+	// Generate a join code for the discussion
+	generateJoinCode: protectedProcedure
+		.input(z.object({ discussionId: z.string().cuid() }))
+		.mutation(async ({ ctx, input }) => {
+			// Check if user is creator or moderator
+			const participant = await ctx.db.discussionParticipant.findUnique({
+				where: {
+					discussionId_userId: {
+						discussionId: input.discussionId,
+						userId: ctx.session.user.id,
+					},
+				},
+			});
+
+			if (
+				!participant ||
+				!["CREATOR", "MODERATOR"].includes(participant.role)
+			) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "Only creators and moderators can generate join codes",
+				});
+			}
+
+			const newJoinCode = generateJoinCode();
+			const expiresAt = new Date();
+			expiresAt.setHours(expiresAt.getHours() + 24); // Expires in 24 hours
+
+			await ctx.db.discussion.update({
+				where: { id: input.discussionId },
+				data: { joinCode: newJoinCode },
+			});
+
+			return {
+				joinCode: newJoinCode,
+				expiresAt,
+			};
 		}),
 
 	// Join a discussion
@@ -137,12 +539,27 @@ export const discussionRouter = createTRPCRouter({
 					OR: [{ id: input.discussionId }, { joinCode: input.joinCode }],
 				},
 				include: {
+					creator: {
+						select: {
+							id: true,
+							name: true,
+							email: true,
+							image: true,
+						},
+					},
+					lesson: {
+						select: {
+							id: true,
+							title: true,
+							description: true,
+							objectives: true,
+							facilitationStyle: true,
+						},
+					},
 					_count: {
 						select: {
 							participants: {
-								where: {
-									status: "ACTIVE",
-								},
+								where: { status: "ACTIVE" },
 							},
 						},
 					},
@@ -164,36 +581,6 @@ export const discussionRouter = createTRPCRouter({
 				});
 			}
 
-			// Check if discussion has expired
-			if (discussion.expiresAt && discussion.expiresAt < new Date()) {
-				throw new TRPCError({
-					code: "PRECONDITION_FAILED",
-					message: "Discussion has expired",
-				});
-			}
-
-			// Check password if required
-			if (discussion.password && !input.password) {
-				throw new TRPCError({
-					code: "UNAUTHORIZED",
-					message: "Password required",
-				});
-			}
-
-			if (discussion.password && input.password) {
-				const isValidPassword = await bcrypt.compare(
-					input.password,
-					discussion.password,
-				);
-
-				if (!isValidPassword) {
-					throw new TRPCError({
-						code: "UNAUTHORIZED",
-						message: "Invalid password",
-					});
-				}
-			}
-
 			// Check if user is already a participant
 			const existingParticipant = await ctx.db.discussionParticipant.findUnique(
 				{
@@ -203,21 +590,56 @@ export const discussionRouter = createTRPCRouter({
 							userId: ctx.session.user.id,
 						},
 					},
+					include: {
+						user: {
+							select: {
+								id: true,
+								name: true,
+								email: true,
+								image: true,
+							},
+						},
+					},
 				},
 			);
 
 			if (existingParticipant) {
-				// Update status if rejoining
+				// Reactivate if needed
 				if (existingParticipant.status !== "ACTIVE") {
-					await ctx.db.discussionParticipant.update({
+					const updatedParticipant = await ctx.db.discussionParticipant.update({
 						where: { id: existingParticipant.id },
 						data: {
 							status: "ACTIVE",
 							leftAt: null,
 						},
+						include: {
+							user: {
+								select: {
+									id: true,
+									name: true,
+									email: true,
+									image: true,
+								},
+							},
+						},
 					});
+
+					return {
+						discussion: formatDiscussionOutput(
+							discussion,
+							existingParticipant.role,
+						),
+						participant: formatParticipantOutput(updatedParticipant),
+					};
 				}
-				return { discussionId: discussion.id, rejoined: true };
+
+				return {
+					discussion: formatDiscussionOutput(
+						discussion,
+						existingParticipant.role,
+					),
+					participant: formatParticipantOutput(existingParticipant),
+				};
 			}
 
 			// Check capacity
@@ -229,12 +651,22 @@ export const discussionRouter = createTRPCRouter({
 			}
 
 			// Add user as participant
-			await ctx.db.discussionParticipant.create({
+			const participant = await ctx.db.discussionParticipant.create({
 				data: {
 					discussionId: discussion.id,
 					userId: ctx.session.user.id,
 					role: "PARTICIPANT" as ParticipantRole,
 					status: "ACTIVE" as ParticipantStatus,
+				},
+				include: {
+					user: {
+						select: {
+							id: true,
+							name: true,
+							email: true,
+							image: true,
+						},
+					},
 				},
 			});
 
@@ -247,17 +679,33 @@ export const discussionRouter = createTRPCRouter({
 				},
 			});
 
-			return { discussionId: discussion.id, joined: true };
+			// Broadcast to WebSocket if available
+			const wsService = getWebSocketService();
+			if (wsService) {
+				wsService.broadcastToDiscussion(discussion.id, {
+					type: "user_joined",
+					discussionId: discussion.id,
+					data: {
+						user: { id: ctx.session.user.id, name: ctx.session.user.name },
+					},
+					timestamp: Date.now(),
+				});
+			}
+
+			return {
+				discussion: formatDiscussionOutput(discussion, "PARTICIPANT"),
+				participant: formatParticipantOutput(participant),
+			};
 		}),
 
 	// Leave a discussion
 	leave: protectedProcedure
-		.input(z.string().cuid())
+		.input(z.object({ discussionId: z.string().cuid() }))
 		.mutation(async ({ ctx, input }) => {
 			const participant = await ctx.db.discussionParticipant.findUnique({
 				where: {
 					discussionId_userId: {
-						discussionId: input,
+						discussionId: input.discussionId,
 						userId: ctx.session.user.id,
 					},
 				},
@@ -270,6 +718,13 @@ export const discussionRouter = createTRPCRouter({
 				});
 			}
 
+			if (participant.role === "CREATOR") {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "Creator cannot leave the discussion. Close it instead.",
+				});
+			}
+
 			// Update participant status
 			await ctx.db.discussionParticipant.update({
 				where: { id: participant.id },
@@ -279,388 +734,176 @@ export const discussionRouter = createTRPCRouter({
 				},
 			});
 
-			// Create system message for user leaving
+			// Create system message
 			await ctx.db.message.create({
 				data: {
-					discussionId: input,
+					discussionId: input.discussionId,
 					content: `${ctx.session.user.name || "A participant"} left the discussion`,
 					type: "SYSTEM" as MessageType,
 				},
 			});
 
-			return { left: true };
+			// Broadcast to WebSocket if available
+			const wsService = getWebSocketService();
+			if (wsService) {
+				wsService.broadcastToDiscussion(input.discussionId, {
+					type: "user_left",
+					discussionId: input.discussionId,
+					data: { userId: ctx.session.user.id },
+					timestamp: Date.now(),
+				});
+			}
+
+			return { success: true };
 		}),
 
-	// Close a discussion
-	close: protectedProcedure
-		.input(z.string().cuid())
-		.mutation(async ({ ctx, input }) => {
-			// Check if user is creator or moderator
-			const participant = await ctx.db.discussionParticipant.findUnique({
+	// Get participants in a discussion
+	getParticipants: protectedProcedure
+		.input(z.object({ id: z.string().cuid() }))
+		.query(async ({ ctx, input }) => {
+			// Check if user is a participant
+			const userParticipant = await ctx.db.discussionParticipant.findUnique({
 				where: {
 					discussionId_userId: {
-						discussionId: input,
+						discussionId: input.id,
+						userId: ctx.session.user.id,
+					},
+				},
+			});
+
+			if (!userParticipant) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "You don't have permission to view participants",
+				});
+			}
+
+			const participants = await ctx.db.discussionParticipant.findMany({
+				where: {
+					discussionId: input.id,
+					status: "ACTIVE",
+				},
+				include: {
+					user: {
+						select: {
+							id: true,
+							name: true,
+							email: true,
+							image: true,
+						},
+					},
+				},
+				orderBy: { joinedAt: "asc" },
+			});
+
+			return {
+				participants: participants.map(formatParticipantOutput),
+			};
+		}),
+
+	// Remove a participant (moderator/creator only)
+	removeParticipant: protectedProcedure
+		.input(
+			z.object({
+				discussionId: z.string().cuid(),
+				participantId: z.string().cuid(),
+				reason: z.string().optional(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// Check if user is creator or moderator
+			const userParticipant = await ctx.db.discussionParticipant.findUnique({
+				where: {
+					discussionId_userId: {
+						discussionId: input.discussionId,
 						userId: ctx.session.user.id,
 					},
 				},
 			});
 
 			if (
-				!participant ||
-				!["CREATOR", "MODERATOR"].includes(participant.role)
+				!userParticipant ||
+				!["CREATOR", "MODERATOR"].includes(userParticipant.role)
 			) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You don't have permission to close this discussion",
+					message: "Only creators and moderators can remove participants",
 				});
 			}
 
-			// Close the discussion
-			const discussion = await ctx.db.discussion.update({
-				where: { id: input },
-				data: {
-					isActive: false,
-					closedAt: new Date(),
+			const participantToRemove = await ctx.db.discussionParticipant.findUnique(
+				{
+					where: { id: input.participantId },
+					include: {
+						user: {
+							select: { name: true },
+						},
+					},
 				},
-			});
+			);
 
-			// Update all active participants
-			await ctx.db.discussionParticipant.updateMany({
-				where: {
-					discussionId: input,
-					status: "ACTIVE",
-				},
+			if (
+				!participantToRemove ||
+				participantToRemove.discussionId !== input.discussionId
+			) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Participant not found",
+				});
+			}
+
+			if (participantToRemove.role === "CREATOR") {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "Cannot remove the creator",
+				});
+			}
+
+			// Remove the participant
+			await ctx.db.discussionParticipant.update({
+				where: { id: input.participantId },
 				data: {
+					status: "REMOVED" as ParticipantStatus,
 					leftAt: new Date(),
 				},
 			});
 
-			// Create closing message
+			// Create system message
+			const reason = input.reason ? ` (${input.reason})` : "";
 			await ctx.db.message.create({
 				data: {
-					discussionId: input,
-					content: "Discussion has been closed",
+					discussionId: input.discussionId,
+					content: `${participantToRemove.user.name || "A participant"} was removed from the discussion${reason}`,
 					type: "SYSTEM" as MessageType,
 				},
 			});
 
-			return discussion;
-		}),
-
-	// List discussions
-	list: protectedProcedure
-		.input(
-			z.object({
-				onlyActive: z.boolean().default(true),
-				onlyMine: z.boolean().default(false),
-				isPublic: z.boolean().optional(),
-				lessonId: z.string().cuid().optional(),
-				limit: z.number().min(1).max(100).default(20),
-				offset: z.number().min(0).default(0),
-			}),
-		)
-		.query(async ({ ctx, input }) => {
-			const where = {
-				...(input.onlyActive && { isActive: true }),
-				...(input.onlyMine
-					? { creatorId: ctx.session.user.id }
-					: {
-							participants: {
-								some: {
-									userId: ctx.session.user.id,
-									status: "ACTIVE" as ParticipantStatus,
-								},
-							},
-						}),
-				...(input.isPublic !== undefined && { isPublic: input.isPublic }),
-				...(input.lessonId && { lessonId: input.lessonId }),
-			};
-
-			const [discussions, total] = await Promise.all([
-				ctx.db.discussion.findMany({
-					where,
-					take: input.limit,
-					skip: input.offset,
-					orderBy: { updatedAt: "desc" },
-					include: {
-						creator: {
-							select: {
-								id: true,
-								name: true,
-								email: true,
-								image: true,
-							},
-						},
-						lesson: {
-							select: {
-								id: true,
-								title: true,
-							},
-						},
-						_count: {
-							select: {
-								participants: {
-									where: {
-										status: "ACTIVE",
-									},
-								},
-								messages: true,
-							},
-						},
-					},
-				}),
-				ctx.db.discussion.count({ where }),
-			]);
-
-			return {
-				discussions,
-				total,
-				hasMore: input.offset + input.limit < total,
-			};
-		}),
-
-	// Get discussion by ID
-	getById: protectedProcedure
-		.input(z.string().cuid())
-		.query(async ({ ctx, input }) => {
-			// Check if user is a participant
-			const participant = await ctx.db.discussionParticipant.findUnique({
-				where: {
-					discussionId_userId: {
-						discussionId: input,
-						userId: ctx.session.user.id,
-					},
-				},
-			});
-
-			if (!participant) {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "You don't have permission to view this discussion",
-				});
-			}
-
-			const discussion = await ctx.db.discussion.findUnique({
-				where: { id: input },
-				include: {
-					creator: {
-						select: {
-							id: true,
-							name: true,
-							email: true,
-							image: true,
-						},
-					},
-					lesson: {
-						select: {
-							id: true,
-							title: true,
-							description: true,
-							objectives: true,
-						},
-					},
-					participants: {
-						where: {
-							status: "ACTIVE",
-						},
-						include: {
-							user: {
-								select: {
-									id: true,
-									name: true,
-									email: true,
-									image: true,
-								},
-							},
-						},
-					},
-					_count: {
-						select: {
-							messages: true,
-						},
-					},
-				},
-			});
-
-			if (!discussion) {
-				throw new TRPCError({
-					code: "NOT_FOUND",
-					message: "Discussion not found",
-				});
-			}
-
-			return discussion;
-		}),
-
-	// Send a message
-	sendMessage: protectedProcedure
-		.input(sendMessageSchema)
-		.mutation(async ({ ctx, input }) => {
-			// Verify user is an active participant
-			const participant = await ctx.db.discussionParticipant.findUnique({
-				where: {
-					discussionId_userId: {
-						discussionId: input.discussionId,
-						userId: ctx.session.user.id,
-					},
-				},
-			});
-
-			if (!participant || participant.status !== "ACTIVE") {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "You must be an active participant to send messages",
-				});
-			}
-
-			// Verify discussion is active
-			const discussion = await ctx.db.discussion.findUnique({
-				where: { id: input.discussionId },
-				select: { isActive: true },
-			});
-
-			if (!discussion?.isActive) {
-				throw new TRPCError({
-					code: "PRECONDITION_FAILED",
-					message: "Discussion is not active",
-				});
-			}
-
-			// Create the message
-			const message = await ctx.db.message.create({
-				data: {
+			// Broadcast to WebSocket if available
+			const wsService = getWebSocketService();
+			if (wsService) {
+				wsService.broadcastToDiscussion(input.discussionId, {
+					type: "user_left",
 					discussionId: input.discussionId,
-					authorId: ctx.session.user.id,
-					content: input.content,
-					parentId: input.parentId,
-					type: "USER" as MessageType,
-				},
-				include: {
-					author: {
-						select: {
-							id: true,
-							name: true,
-							email: true,
-							image: true,
-						},
-					},
-					parent: {
-						select: {
-							id: true,
-							content: true,
-							author: {
-								select: {
-									name: true,
-								},
-							},
-						},
-					},
-				},
-			});
-
-			// Update participant's message count and last seen
-			await ctx.db.discussionParticipant.update({
-				where: { id: participant.id },
-				data: {
-					messageCount: { increment: 1 },
-					lastSeenAt: new Date(),
-				},
-			});
-
-			return message;
-		}),
-
-	// Get messages
-	getMessages: protectedProcedure
-		.input(getMessagesSchema)
-		.query(async ({ ctx, input }) => {
-			// Verify user is a participant
-			const participant = await ctx.db.discussionParticipant.findUnique({
-				where: {
-					discussionId_userId: {
-						discussionId: input.discussionId,
-						userId: ctx.session.user.id,
-					},
-				},
-			});
-
-			if (!participant) {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "You don't have permission to view messages",
+					data: { userId: participantToRemove.userId, removed: true },
+					timestamp: Date.now(),
 				});
 			}
 
-			// Update last seen
-			await ctx.db.discussionParticipant.update({
-				where: { id: participant.id },
-				data: {
-					lastSeenAt: new Date(),
-				},
-			});
-
-			const where = {
-				discussionId: input.discussionId,
-				...(input.parentId !== undefined && { parentId: input.parentId }),
-				...(input.cursor && { id: { lt: input.cursor } }),
-			};
-
-			const messages = await ctx.db.message.findMany({
-				where,
-				take: input.limit + 1, // Take one extra to check if there are more
-				orderBy: { createdAt: "desc" },
-				include: {
-					author: {
-						select: {
-							id: true,
-							name: true,
-							email: true,
-							image: true,
-						},
-					},
-					parent: {
-						select: {
-							id: true,
-							content: true,
-							author: {
-								select: {
-									name: true,
-								},
-							},
-						},
-					},
-					_count: {
-						select: {
-							replies: true,
-						},
-					},
-				},
-			});
-
-			let hasMore = false;
-			if (messages.length > input.limit) {
-				messages.pop();
-				hasMore = true;
-			}
-
-			return {
-				messages,
-				hasMore,
-				nextCursor: messages[messages.length - 1]?.id,
-			};
+			return { success: true };
 		}),
 
-	// Generate AI question (placeholder - would connect to AI service)
-	generateAIQuestion: protectedProcedure
+	// Update participant role (creator only)
+	updateParticipantRole: protectedProcedure
 		.input(
 			z.object({
 				discussionId: z.string().cuid(),
-				context: z.string().optional(),
+				participantId: z.string().cuid(),
+				role: z.enum(["MODERATOR", "PARTICIPANT"]),
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
-			// Verify user is a participant
-			const participant = await ctx.db.discussionParticipant.findUnique({
+			// Check if user is creator
+			const userParticipant = await ctx.db.discussionParticipant.findUnique({
 				where: {
 					discussionId_userId: {
 						discussionId: input.discussionId,
@@ -669,61 +912,51 @@ export const discussionRouter = createTRPCRouter({
 				},
 			});
 
-			if (!participant || participant.status !== "ACTIVE") {
+			if (!userParticipant || userParticipant.role !== "CREATOR") {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You must be an active participant",
+					message: "Only the creator can update participant roles",
 				});
 			}
 
-			// Get discussion with lesson info
-			const discussion = await ctx.db.discussion.findUnique({
-				where: { id: input.discussionId },
+			const participantToUpdate = await ctx.db.discussionParticipant.findUnique(
+				{
+					where: { id: input.participantId },
+				},
+			);
+
+			if (
+				!participantToUpdate ||
+				participantToUpdate.discussionId !== input.discussionId
+			) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Participant not found",
+				});
+			}
+
+			if (participantToUpdate.role === "CREATOR") {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "Cannot change creator role",
+				});
+			}
+
+			const updatedParticipant = await ctx.db.discussionParticipant.update({
+				where: { id: input.participantId },
+				data: { role: input.role },
 				include: {
-					lesson: {
+					user: {
 						select: {
-							content: true,
-							objectives: true,
-							keyQuestions: true,
-							facilitationStyle: true,
+							id: true,
+							name: true,
+							email: true,
+							image: true,
 						},
 					},
 				},
 			});
 
-			if (!discussion?.isActive) {
-				throw new TRPCError({
-					code: "PRECONDITION_FAILED",
-					message: "Discussion is not active",
-				});
-			}
-
-			// Get recent messages for context
-			const recentMessages = await ctx.db.message.findMany({
-				where: {
-					discussionId: input.discussionId,
-					type: { in: ["USER", "AI_QUESTION"] },
-				},
-				orderBy: { createdAt: "desc" },
-				take: 10,
-				include: {
-					author: {
-						select: { name: true },
-					},
-				},
-			});
-
-			// TODO: Integrate with AI service to generate Socratic question
-			// For now, return a placeholder question
-			const aiQuestion = await ctx.db.message.create({
-				data: {
-					discussionId: input.discussionId,
-					content:
-						"What assumptions are you making in your statement? Can you identify them?",
-					type: "AI_QUESTION" as MessageType,
-				},
-			});
-
-			return aiQuestion;
+			return formatParticipantOutput(updatedParticipant);
 		}),
 });
