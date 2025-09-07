@@ -57,7 +57,7 @@ npm run preview       # Build and start production locally
 
 **Authentication**: NextAuth.js with Discord provider. Sessions are available in tRPC context via `ctx.session`.
 
-**Database Access**: Use the Prisma client instance from `@/server/db`. The schema includes User, Account, Session, Post, and VerificationToken models.
+**Database Access**: Use the Prisma client instance from `@/server/db`. The schema includes User, Account, Session, Discussion, Group, Lesson, and VerificationToken models.
 
 **Environment Variables**: Validated using zod in `/src/env.js`. Required vars:
 - `DATABASE_URL` - PostgreSQL connection string
@@ -71,3 +71,15 @@ npm run preview       # Build and start production locally
 - Biome for formatting and linting with Tailwind class sorting enabled
 - TypeScript strict mode with `noUncheckedIndexedAccess`
 - ESM modules (`"type": "module"` in package.json)
+
+## Recent Changes
+
+### Lesson Management System (v0.2.0)
+**Branch**: `001-we-want-to`
+- Added Organization entity with tiered pricing (SMALL/MEDIUM/LARGE)
+- Implemented lesson versioning system with LessonVersion model
+- Added organization-based access control (OWNER/ADMIN/MEMBER roles)
+- Created lesson CRUD with copy/fork functionality
+- New tRPC routers: `organization` and `lesson`
+- Updated sidebar navigation to include "Lessons" entry
+- Multi-tenant architecture with data isolation per organization
