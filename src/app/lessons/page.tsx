@@ -5,6 +5,10 @@ import { redirect } from "next/navigation";
 import { useState } from "react";
 
 import { DashboardLayout } from "@/components/dashboard-layout";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Plus } from "lucide-react";
 import { CreateLessonForm } from "./_components/create-lesson-form";
 import { EditLessonForm } from "./_components/edit-lesson-form";
 import { LessonList } from "./_components/lesson-list";
@@ -19,10 +23,10 @@ export default function LessonsPage() {
 	if (status === "loading") {
 		return (
 			<DashboardLayout>
-				<div className="animate-pulse space-y-4">
-					<div className="h-8 w-1/2 rounded bg-gray-300 dark:bg-gray-600"></div>
-					<div className="h-4 w-3/4 rounded bg-gray-300 dark:bg-gray-600"></div>
-					<div className="h-64 rounded bg-gray-300 dark:bg-gray-600"></div>
+				<div className="space-y-4">
+					<Skeleton className="h-8 w-1/2" />
+					<Skeleton className="h-4 w-3/4" />
+					<Skeleton className="h-64 w-full" />
 				</div>
 			</DashboardLayout>
 		);
@@ -63,10 +67,8 @@ export default function LessonsPage() {
 	return (
 		<DashboardLayout breadcrumbItems={breadcrumbItems}>
 			<div className="mb-8">
-				<h1 className="font-bold text-3xl text-gray-900 dark:text-gray-100">
-					Lesson Management
-				</h1>
-				<p className="mt-2 text-gray-600 dark:text-gray-400">
+				<h1 className="font-bold text-3xl">Lesson Management</h1>
+				<p className="mt-2 text-muted-foreground">
 					Create, organize, and manage lessons that guide AI-facilitated
 					Socratic discussions.
 				</p>
@@ -78,68 +80,46 @@ export default function LessonsPage() {
 						{/* Header with Create Button */}
 						<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 							<div>
-								<h2 className="font-semibold text-gray-900 text-xl dark:text-gray-100">
-									Your Lessons
-								</h2>
-								<p className="text-gray-600 text-sm dark:text-gray-400">
+								<h2 className="font-semibold text-xl">Your Lessons</h2>
+								<p className="text-muted-foreground text-sm">
 									Manage your lesson content and track their status
 								</p>
 							</div>
 
-							<button
-								onClick={() => setViewMode("create")}
-								className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 font-medium text-sm text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-							>
-								<svg
-									className="mr-2 h-4 w-4"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
-								>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										strokeWidth={2}
-										d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-									/>
-								</svg>
+							<Button onClick={() => setViewMode("create")}>
+								<Plus className="mr-2 h-4 w-4" />
 								Create New Lesson
-							</button>
+							</Button>
 						</div>
 
 						{/* Lesson List */}
 						<LessonList onEditLesson={handleEditLesson} />
 
 						{/* Status Legend */}
-						<div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
-							<h3 className="mb-3 font-medium text-gray-900 text-sm dark:text-gray-100">
-								Lesson Status Guide
-							</h3>
+						<div className="rounded-lg bg-muted/50 p-4">
+							<h3 className="mb-3 font-medium text-sm">Lesson Status Guide</h3>
 							<div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
 								<div className="flex items-center gap-2">
-									<div className="h-2 w-2 rounded-full bg-yellow-500"></div>
-									<span className="text-gray-600 dark:text-gray-400">
-										<strong className="text-yellow-600 dark:text-yellow-400">
-											Draft:
-										</strong>{" "}
+									<Badge variant="outline" className="gap-1 text-xs">
+										Draft
+									</Badge>
+									<span className="text-muted-foreground">
 										Can be edited and published
 									</span>
 								</div>
 								<div className="flex items-center gap-2">
-									<div className="h-2 w-2 rounded-full bg-green-500"></div>
-									<span className="text-gray-600 dark:text-gray-400">
-										<strong className="text-green-600 dark:text-green-400">
-											Published:
-										</strong>{" "}
+									<Badge variant="default" className="gap-1 text-xs">
+										Published
+									</Badge>
+									<span className="text-muted-foreground">
 										Available for discussions
 									</span>
 								</div>
 								<div className="flex items-center gap-2">
-									<div className="h-2 w-2 rounded-full bg-gray-400"></div>
-									<span className="text-gray-600 dark:text-gray-400">
-										<strong className="text-gray-600 dark:text-gray-400">
-											Archived:
-										</strong>{" "}
+									<Badge variant="secondary" className="gap-1 text-xs">
+										Archived
+									</Badge>
+									<span className="text-muted-foreground">
 										Read-only, can be forked
 									</span>
 								</div>

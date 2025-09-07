@@ -1,6 +1,27 @@
 "use client";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/trpc/react";
+import { X } from "lucide-react";
 import { useState } from "react";
 
 type FacilitationStyle = "exploratory" | "analytical" | "ethical";
@@ -85,273 +106,219 @@ export function CreateLessonForm({
 	};
 
 	return (
-		<div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-			<div className="mb-6">
-				<h2 className="font-semibold text-gray-900 text-xl dark:text-gray-100">
-					Create New Lesson
-				</h2>
-				<p className="mt-1 text-gray-600 text-sm dark:text-gray-400">
+		<Card>
+			<CardHeader>
+				<CardTitle>Create New Lesson</CardTitle>
+				<CardDescription>
 					Design a lesson to guide AI-facilitated discussions.
-				</p>
-			</div>
-
-			<form onSubmit={handleSubmit} className="space-y-6">
-				<div>
-					<label
-						htmlFor="title"
-						className="block font-medium text-gray-700 text-sm dark:text-gray-300"
-					>
-						Title *
-					</label>
-					<input
-						type="text"
-						id="title"
-						required
-						maxLength={200}
-						value={formData.title}
-						onChange={(e) =>
-							setFormData((prev) => ({ ...prev, title: e.target.value }))
-						}
-						className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-						placeholder="Enter lesson title"
-					/>
-					<p className="mt-1 text-gray-500 text-xs dark:text-gray-400">
-						{formData.title.length}/200 characters
-					</p>
-				</div>
-
-				<div>
-					<label
-						htmlFor="description"
-						className="block font-medium text-gray-700 text-sm dark:text-gray-300"
-					>
-						Description *
-					</label>
-					<textarea
-						id="description"
-						required
-						rows={3}
-						value={formData.description}
-						onChange={(e) =>
-							setFormData((prev) => ({ ...prev, description: e.target.value }))
-						}
-						className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-						placeholder="Briefly describe what this lesson covers"
-					/>
-				</div>
-
-				<div>
-					<label
-						htmlFor="content"
-						className="block font-medium text-gray-700 text-sm dark:text-gray-300"
-					>
-						Content *
-					</label>
-					<textarea
-						id="content"
-						required
-						rows={6}
-						value={formData.content}
-						onChange={(e) =>
-							setFormData((prev) => ({ ...prev, content: e.target.value }))
-						}
-						className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-						placeholder="Detailed lesson content, instructions, and materials"
-					/>
-				</div>
-
-				<div>
-					<label className="block font-medium text-gray-700 text-sm dark:text-gray-300">
-						Learning Objectives
-					</label>
-					<div className="mt-1 flex gap-2">
-						<input
-							type="text"
-							value={objectiveInput}
-							onChange={(e) => setObjectiveInput(e.target.value)}
-							onKeyDown={(e) =>
-								e.key === "Enter" && (e.preventDefault(), addObjective())
+				</CardDescription>
+			</CardHeader>
+			<CardContent>
+				<form onSubmit={handleSubmit} className="space-y-6">
+					<div className="space-y-2">
+						<Label htmlFor="title">Title *</Label>
+						<Input
+							id="title"
+							required
+							maxLength={200}
+							value={formData.title}
+							onChange={(e) =>
+								setFormData((prev) => ({ ...prev, title: e.target.value }))
 							}
-							className="flex-1 rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-							placeholder="Add a learning objective"
+							placeholder="Enter lesson title"
 						/>
-						<button
-							type="button"
-							onClick={addObjective}
-							className="rounded-md bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-						>
-							Add
-						</button>
+						<p className="text-muted-foreground text-xs">
+							{formData.title.length}/200 characters
+						</p>
 					</div>
-					{formData.objectives.length > 0 && (
-						<div className="mt-2 flex flex-wrap gap-2">
-							{formData.objectives.map((objective, index) => (
-								<span
-									key={index}
-									className="inline-flex items-center rounded-md bg-blue-100 px-2 py-1 text-blue-800 text-sm dark:bg-blue-900/30 dark:text-blue-300"
-								>
-									{objective}
-									<button
-										type="button"
-										onClick={() => removeObjective(index)}
-										className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+
+					<div className="space-y-2">
+						<Label htmlFor="description">Description *</Label>
+						<Textarea
+							id="description"
+							required
+							rows={3}
+							value={formData.description}
+							onChange={(e) =>
+								setFormData((prev) => ({
+									...prev,
+									description: e.target.value,
+								}))
+							}
+							placeholder="Briefly describe what this lesson covers"
+						/>
+					</div>
+
+					<div className="space-y-2">
+						<Label htmlFor="content">Content *</Label>
+						<Textarea
+							id="content"
+							required
+							rows={6}
+							value={formData.content}
+							onChange={(e) =>
+								setFormData((prev) => ({ ...prev, content: e.target.value }))
+							}
+							placeholder="Detailed lesson content, instructions, and materials"
+						/>
+					</div>
+
+					<div className="space-y-2">
+						<Label>Learning Objectives</Label>
+						<div className="flex gap-2">
+							<Input
+								value={objectiveInput}
+								onChange={(e) => setObjectiveInput(e.target.value)}
+								onKeyDown={(e) =>
+									e.key === "Enter" && (e.preventDefault(), addObjective())
+								}
+								placeholder="Add a learning objective"
+								className="flex-1"
+							/>
+							<Button type="button" onClick={addObjective}>
+								Add
+							</Button>
+						</div>
+						{formData.objectives.length > 0 && (
+							<div className="flex flex-wrap gap-2">
+								{formData.objectives.map((objective, index) => (
+									<Badge key={index} variant="secondary" className="gap-1">
+										{objective}
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											onClick={() => removeObjective(index)}
+											className="h-4 w-4 p-0 hover:bg-transparent"
+										>
+											<X className="h-3 w-3" />
+										</Button>
+									</Badge>
+								))}
+							</div>
+						)}
+					</div>
+
+					<div className="space-y-2">
+						<Label>Key Questions</Label>
+						<div className="flex gap-2">
+							<Input
+								value={questionInput}
+								onChange={(e) => setQuestionInput(e.target.value)}
+								onKeyDown={(e) =>
+									e.key === "Enter" && (e.preventDefault(), addQuestion())
+								}
+								placeholder="Add a key question for discussion"
+								className="flex-1"
+							/>
+							<Button type="button" onClick={addQuestion}>
+								Add
+							</Button>
+						</div>
+						{formData.keyQuestions.length > 0 && (
+							<div className="space-y-2">
+								{formData.keyQuestions.map((question, index) => (
+									<div
+										key={index}
+										className="flex items-start justify-between rounded-md bg-muted px-3 py-2"
 									>
-										×
-									</button>
-								</span>
-							))}
+										<span className="text-sm">{question}</span>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											onClick={() => removeQuestion(index)}
+											className="h-6 w-6 hover:text-destructive"
+										>
+											<X className="h-4 w-4" />
+										</Button>
+									</div>
+								))}
+							</div>
+						)}
+					</div>
+
+					<div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+						<div className="space-y-2">
+							<Label htmlFor="facilitationStyle">Facilitation Style</Label>
+							<Select
+								value={formData.facilitationStyle}
+								onValueChange={(value) =>
+									setFormData((prev) => ({
+										...prev,
+										facilitationStyle: value as FacilitationStyle,
+									}))
+								}
+							>
+								<SelectTrigger>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="exploratory">Exploratory</SelectItem>
+									<SelectItem value="analytical">Analytical</SelectItem>
+									<SelectItem value="ethical">Ethical</SelectItem>
+								</SelectContent>
+							</Select>
 						</div>
-					)}
-				</div>
 
-				<div>
-					<label className="block font-medium text-gray-700 text-sm dark:text-gray-300">
-						Key Questions
-					</label>
-					<div className="mt-1 flex gap-2">
-						<input
-							type="text"
-							value={questionInput}
-							onChange={(e) => setQuestionInput(e.target.value)}
-							onKeyDown={(e) =>
-								e.key === "Enter" && (e.preventDefault(), addQuestion())
-							}
-							className="flex-1 rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-							placeholder="Add a key question for discussion"
-						/>
-						<button
-							type="button"
-							onClick={addQuestion}
-							className="rounded-md bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-						>
-							Add
-						</button>
-					</div>
-					{formData.keyQuestions.length > 0 && (
-						<div className="mt-2 space-y-1">
-							{formData.keyQuestions.map((question, index) => (
-								<div
-									key={index}
-									className="flex items-start justify-between rounded-md bg-gray-50 px-3 py-2 dark:bg-gray-700"
-								>
-									<span className="text-gray-700 text-sm dark:text-gray-300">
-										{question}
-									</span>
-									<button
-										type="button"
-										onClick={() => removeQuestion(index)}
-										className="ml-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400"
-									>
-										×
-									</button>
-								</div>
-							))}
+						<div className="space-y-2">
+							<Label htmlFor="suggestedDuration">Duration (minutes)</Label>
+							<Input
+								type="number"
+								id="suggestedDuration"
+								min="1"
+								max="240"
+								value={formData.suggestedDuration || ""}
+								onChange={(e) =>
+									setFormData((prev) => ({
+										...prev,
+										suggestedDuration: e.target.value
+											? Number.parseInt(e.target.value)
+											: undefined,
+									}))
+								}
+								placeholder="Optional"
+							/>
 						</div>
-					)}
-				</div>
 
-				<div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-					<div>
-						<label
-							htmlFor="facilitationStyle"
-							className="block font-medium text-gray-700 text-sm dark:text-gray-300"
-						>
-							Facilitation Style
-						</label>
-						<select
-							id="facilitationStyle"
-							value={formData.facilitationStyle}
-							onChange={(e) =>
-								setFormData((prev) => ({
-									...prev,
-									facilitationStyle: e.target.value as FacilitationStyle,
-								}))
-							}
-							className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-						>
-							<option value="exploratory">Exploratory</option>
-							<option value="analytical">Analytical</option>
-							<option value="ethical">Ethical</option>
-						</select>
-					</div>
-
-					<div>
-						<label
-							htmlFor="suggestedDuration"
-							className="block font-medium text-gray-700 text-sm dark:text-gray-300"
-						>
-							Duration (minutes)
-						</label>
-						<input
-							type="number"
-							id="suggestedDuration"
-							min="1"
-							max="240"
-							value={formData.suggestedDuration || ""}
-							onChange={(e) =>
-								setFormData((prev) => ({
-									...prev,
-									suggestedDuration: e.target.value
-										? Number.parseInt(e.target.value)
-										: undefined,
-								}))
-							}
-							className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-							placeholder="Optional"
-						/>
-					</div>
-
-					<div>
-						<label
-							htmlFor="suggestedGroupSize"
-							className="block font-medium text-gray-700 text-sm dark:text-gray-300"
-						>
-							Group Size
-						</label>
-						<input
-							type="number"
-							id="suggestedGroupSize"
-							min="1"
-							max="20"
-							value={formData.suggestedGroupSize}
-							onChange={(e) =>
-								setFormData((prev) => ({
-									...prev,
-									suggestedGroupSize: Number.parseInt(e.target.value) || 3,
-								}))
-							}
-							className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-						/>
-					</div>
-				</div>
-
-				{createMutation.error && (
-					<div className="rounded-md bg-red-50 p-4 dark:bg-red-900/30">
-						<div className="text-red-700 text-sm dark:text-red-400">
-							Error creating lesson: {createMutation.error.message}
+						<div className="space-y-2">
+							<Label htmlFor="suggestedGroupSize">Group Size</Label>
+							<Input
+								type="number"
+								id="suggestedGroupSize"
+								min="1"
+								max="20"
+								value={formData.suggestedGroupSize}
+								onChange={(e) =>
+									setFormData((prev) => ({
+										...prev,
+										suggestedGroupSize: Number.parseInt(e.target.value) || 3,
+									}))
+								}
+							/>
 						</div>
 					</div>
-				)}
 
-				<div className="flex items-center justify-end space-x-3 border-gray-200 border-t pt-4 dark:border-gray-600">
-					{onCancel && (
-						<button
-							type="button"
-							onClick={onCancel}
-							className="rounded-md border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 text-sm shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:focus:ring-offset-gray-800 dark:hover:bg-gray-600"
-						>
-							Cancel
-						</button>
+					{createMutation.error && (
+						<Alert variant="destructive">
+							<AlertDescription>
+								Error creating lesson: {createMutation.error.message}
+							</AlertDescription>
+						</Alert>
 					)}
-					<button
-						type="submit"
-						disabled={createMutation.isPending}
-						className="rounded-md border border-transparent bg-blue-600 px-4 py-2 font-medium text-sm text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-gray-800"
-					>
-						{createMutation.isPending ? "Creating..." : "Create Lesson"}
-					</button>
-				</div>
-			</form>
-		</div>
+
+					<div className="flex items-center justify-end space-x-3 border-t pt-4">
+						{onCancel && (
+							<Button type="button" variant="outline" onClick={onCancel}>
+								Cancel
+							</Button>
+						)}
+						<Button type="submit" disabled={createMutation.isPending}>
+							{createMutation.isPending ? "Creating..." : "Create Lesson"}
+						</Button>
+					</div>
+				</form>
+			</CardContent>
+		</Card>
 	);
 }

@@ -152,6 +152,16 @@ const lessons = await trpc.lesson.list.query();
 
 ## Recent Changes
 
+### Discussions and Participant Experience (v0.3.0) 🚧 IN PLANNING
+**Branch**: `002-discussions-and-participant`
+- 📋 Create discussions from published lessons
+- 📋 Email and link-based invitation system
+- 📋 Real-time messaging with WebSocket support
+- 📋 AI-facilitated Socratic dialogue
+- 📋 Cohort management and participant tracking
+- 📋 tRPC routers: discussion, invitation, message
+- 📋 Integration with Resend (email) and OpenAI (AI facilitation)
+
 ### Core Lesson Management System (v0.2.0) ✅ COMPLETED
 **Branch**: `001-core-lesson-management`
 - ✅ Implemented complete CRUD operations for lesson management
@@ -162,9 +172,3 @@ const lessons = await trpc.lesson.list.query();
 - ✅ Integrated with existing Prisma Lesson model (no schema changes needed)
 - ✅ Business logic for state transitions and ownership validation
 - ✅ Error handling, logging, and user permission enforcement
-
-### Previous: Lesson Management System (v0.1.0) 
-**Branch**: `001-we-want-to`
-- Added Organization entity with tiered pricing (SMALL/MEDIUM/LARGE)
-- Implemented lesson versioning system with LessonVersion model
-- Added organization-based access control (OWNER/ADMIN/MEMBER roles)
