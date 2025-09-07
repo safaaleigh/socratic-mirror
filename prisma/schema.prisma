@@ -18,6 +18,22 @@ model User {
   sessions      Session[]
   // Optional for WebAuthn support
   Authenticator Authenticator[]
+  
+  // Discussion relations
+  createdDiscussions Discussion[] @relation("CreatedDiscussions")
+  discussionParticipations DiscussionParticipant[] @relation("DiscussionParticipations")
+  messages      Message[] @relation("Messages")
+  
+  // Group relations
+  createdGroups Group[] @relation("CreatedGroups")
+  groupMemberships GroupMember[] @relation("GroupMemberships")
+  
+  // Lesson relations
+  createdLessons Lesson[] @relation("CreatedLessons")
+  
+  // Invitation relations
+  sentInvitations Invitation[] @relation("SentInvitations")
+  receivedInvitations Invitation[] @relation("ReceivedInvitations")
  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -76,4 +92,290 @@ model Authenticator {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
  
   @@id([userId, credentialID])
+}
+
+// ==================== Discussion Models ====================
+
+// Discussion - represents a Socratic discussion room
+model Discussion {
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  
+  // Creator/Administrator
+  creatorId   String
+  creator     User     @relation("CreatedDiscussions", fields: [creatorId], references: [id], onDelete: Restrict)
+  
+  // Discussion configuration
+  isActive    Boolean  @default(true)
+  isPublic    Boolean  @default(false)
+  maxParticipants Int  @default(20)
+  
+  // Access control
+  joinCode    String?  @unique @db.VarChar(8)
+  password    String?
+  
+  // Scheduling
+  scheduledFor DateTime?
+  expiresAt    DateTime?
+  
+  // Lesson linkage
+  lessonId    String?
+  lesson      Lesson?  @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  
+  // Group linkage (for tracking which group this discussion was created from)
+  sourceGroupId String?
+  sourceGroup   Group?   @relation(fields: [sourceGroupId], references: [id], onDelete: SetNull)
+  
+  // AI Facilitator configuration
+  aiConfig     Json     @default("{}")
+  systemPrompt String?  @db.Text
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  closedAt    DateTime?
+  
+  // Relations
+  participants DiscussionParticipant[]
+  messages     Message[]
+  
+  @@index([creatorId])
+  @@index([joinCode])
+  @@index([isActive, isPublic])
+  @@index([lessonId])
+  @@index([sourceGroupId])
+}
+
+// Junction table for Discussion participants with metadata
+model DiscussionParticipant {
+  id        String   @id @default(cuid())
+  
+  discussionId  String
+  discussion    Discussion   @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  
+  userId    String
+  user      User     @relation("DiscussionParticipations", fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Participant metadata
+  role      ParticipantRole @default(PARTICIPANT)
+  status    ParticipantStatus @default(ACTIVE)
+  
+  // Activity tracking
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+  lastSeenAt DateTime @default(now())
+  
+  // Engagement metrics
+  messageCount Int @default(0)
+  
+  @@unique([discussionId, userId])
+  @@index([userId])
+  @@index([discussionId, status])
+}
+
+// Message model for discussions
+model Message {
+  id        String   @id @default(cuid())
+  
+  discussionId  String
+  discussion    Discussion   @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  
+  // Author can be null for AI messages
+  authorId  String?
+  author    User?    @relation("Messages", fields: [authorId], references: [id], onDelete: SetNull)
+  
+  content   String   @db.Text
+  type      MessageType @default(USER)
+  
+  // Threading support
+  parentId  String?
+  parent    Message? @relation("MessageReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Message[] @relation("MessageReplies")
+  
+  // Metadata
+  isEdited  Boolean  @default(false)
+  editedAt  DateTime?
+  
+  createdAt DateTime @default(now())
+  
+  @@index([discussionId, createdAt])
+  @@index([authorId])
+  @@index([parentId])
+}
+
+// Group - represents a collection of participants
+model Group {
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  
+  // Creator/Owner
+  creatorId   String
+  creator     User     @relation("CreatedGroups", fields: [creatorId], references: [id], onDelete: Restrict)
+  
+  // Group settings
+  isActive    Boolean  @default(true)
+  maxMembers  Int      @default(100)
+  
+  // Used for automatic discussion generation
+  autoGroupSize Int    @default(3) // Number of participants per auto-generated discussion
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  members     GroupMember[]
+  generatedDiscussions Discussion[] // Discussions created from this group
+  
+  @@index([creatorId])
+  @@index([isActive])
+}
+
+// Junction table for Group members
+model GroupMember {
+  id        String   @id @default(cuid())
+  
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  
+  userId    String
+  user      User     @relation("GroupMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Member metadata
+  role      GroupRole @default(MEMBER)
+  status    GroupMemberStatus @default(ACTIVE)
+  
+  // Timestamps
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+  
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@index([groupId, status])
+}
+
+// Lesson - content that guides AI facilitation
+model Lesson {
+  id          String   @id @default(cuid())
+  title       String   @db.VarChar(200)
+  description String?  @db.Text
+  
+  // Lesson content that guides the AI facilitator
+  content     String   @db.Text
+  
+  // Learning objectives
+  objectives  String[] @default([])
+  
+  // Creator/Author
+  creatorId   String
+  creator     User     @relation("CreatedLessons", fields: [creatorId], references: [id], onDelete: Restrict)
+  
+  // Lesson settings
+  isPublished Boolean  @default(false)
+  isArchived  Boolean  @default(false)
+  
+  // Suggested discussion settings
+  suggestedDuration Int? // in minutes
+  suggestedGroupSize Int @default(3)
+  
+  // AI facilitation hints
+  facilitationStyle String @default("exploratory") // exploratory, analytical, ethical
+  keyQuestions String[] @default([]) // Key questions AI should explore
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  publishedAt DateTime?
+  
+  // Relations
+  discussions Discussion[]
+  
+  @@index([creatorId])
+  @@index([isPublished, isArchived])
+}
+
+// Invitation - tracks invitations to groups and discussions
+model Invitation {
+  id          String   @id @default(cuid())
+  
+  // Type and target of invitation
+  type        InvitationType
+  targetId    String   // ID of the group or discussion
+  
+  // Recipient information
+  recipientEmail String
+  recipientId    String?  // null if inviting non-registered user
+  recipient      User?    @relation("ReceivedInvitations", fields: [recipientId], references: [id], onDelete: Cascade)
+  
+  // Sender information
+  senderId    String
+  sender      User     @relation("SentInvitations", fields: [senderId], references: [id], onDelete: Cascade)
+  
+  // Invitation details
+  message     String?  @db.Text // Optional personalized message
+  token       String   @unique @default(cuid())
+  status      InvitationStatus @default(PENDING)
+  
+  // Expiration and timestamps
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  declinedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([recipientEmail])
+  @@index([recipientId])
+  @@index([token])
+  @@index([type, targetId])
+  @@index([status, expiresAt])
+}
+
+// ==================== Enums ====================
+
+enum ParticipantRole {
+  CREATOR
+  MODERATOR
+  PARTICIPANT
+}
+
+enum ParticipantStatus {
+  ACTIVE
+  INACTIVE
+  REMOVED
+  LEFT
+}
+
+enum MessageType {
+  USER
+  AI_QUESTION
+  AI_PROMPT
+  SYSTEM
+  MODERATOR
+}
+
+enum GroupRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum GroupMemberStatus {
+  ACTIVE
+  INACTIVE
+  REMOVED
+}
+
+enum InvitationType {
+  GROUP
+  DISCUSSION
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELLED
 }
