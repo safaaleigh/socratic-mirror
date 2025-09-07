@@ -18,23 +18,35 @@ This is a T3 Stack application using:
 
 ```bash
 # Development
-npm run dev           # Start Next.js dev server with Turbo
+bun run dev           # Start Next.js dev server with Turbo
+bun run dev --port 3001  # Start on custom port
 
 # Code Quality
-npm run check         # Run Biome linter/formatter check
-npm run check:write   # Auto-fix Biome issues
-npm run typecheck     # TypeScript type checking (tsc --noEmit)
+bun run check         # Run Biome linter/formatter check
+bun run check:write   # Auto-fix Biome issues
+bun run typecheck     # TypeScript type checking (tsc --noEmit)
+
+# Testing
+bun test              # Run unit tests (Vitest)
+bun test tests/lesson/  # Run specific test suite
+bunx playwright test  # Run E2E tests (Playwright)
+bun test tests/performance/  # Run performance tests
 
 # Database
-npm run db:push       # Push schema changes to database
-npm run db:generate   # Generate Prisma migrations
-npm run db:migrate    # Apply migrations to production
-npm run db:studio     # Open Prisma Studio GUI
+bun run db:push       # Push schema changes to database
+bun run db:generate   # Generate Prisma migrations
+bun run db:migrate    # Apply migrations to production
+bun run db:studio     # Open Prisma Studio GUI
 
 # Build & Production
-npm run build         # Build for production
-npm run start         # Start production server
-npm run preview       # Build and start production locally
+bun run build         # Build for production
+bun run start         # Start production server
+bun run preview       # Build and start production locally
+
+# Dependencies
+bun install           # Install dependencies
+bun add <package>     # Add dependency
+bun add -d <package>  # Add dev dependency
 ```
 
 ## Architecture
@@ -65,6 +77,72 @@ npm run preview       # Build and start production locally
 - `AUTH_SECRET` - NextAuth secret (required in production)
 
 **Path Aliases**: Use `@/*` to import from `/src/*`
+
+## Features
+
+### Lesson Management System
+
+**Core Feature**: Complete CRUD lesson management with lifecycle support, integrated UI, and comprehensive testing.
+
+#### API Overview
+The lesson management system is built around the `lesson` tRPC router (`/src/server/api/routers/lesson.ts`) with these endpoints:
+
+- `lesson.create` - Create new lesson (draft status)
+- `lesson.list` - Get user's lessons with computed status
+- `lesson.getById` - Fetch specific lesson with ownership validation
+- `lesson.update` - Update lesson content (draft/published only)
+- `lesson.publish` - Publish lesson (draft → published)
+- `lesson.archive` - Archive lesson (published → archived)
+- `lesson.delete` - Delete lesson with discussion handling
+- `lesson.fork` - Create copy from archived lesson
+
+#### Data Model
+Lessons use the existing Prisma `Lesson` model with computed status:
+```typescript
+type LessonStatus = "draft" | "published" | "archived"
+// Computed from isPublished and isArchived boolean fields
+```
+
+#### UI Components
+Lesson management UI at `/lessons` with:
+- **Lesson List** (`/src/app/lessons/_components/lesson-list.tsx`) - Displays lessons with status indicators
+- **Create Form** (`/src/app/lessons/_components/create-lesson-form.tsx`) - New lesson creation
+- **Edit Form** (`/src/app/lessons/_components/edit-lesson-form.tsx`) - Lesson modification
+- **Navigation Integration** - Added to sidebar navigation
+
+#### Lifecycle States
+```
+Draft → Published → Archived
+  ↓         ↓         ↓
+Edit      Archive   Fork
+Delete    Delete    Delete
+```
+
+#### Testing Coverage
+- **Unit Tests**: 42 tests covering all CRUD operations, lifecycle transitions, validation, and error cases
+- **E2E Tests**: 21 Playwright tests covering complete user workflows across browsers
+- **Performance Tests**: 11 tests validating <2s response times (avg 313ms)
+
+#### Usage Examples
+```typescript
+// Create lesson
+const lesson = await trpc.lesson.create.mutate({
+  title: "Critical Thinking Basics",
+  description: "Introduction to analytical reasoning",
+  content: "Learn to evaluate arguments...",
+  objectives: ["Identify logical fallacies"],
+  keyQuestions: ["What makes an argument valid?"],
+  facilitationStyle: "analytical",
+  suggestedDuration: 45,
+  suggestedGroupSize: 4
+});
+
+// Publish lesson
+await trpc.lesson.publish.mutate({ id: lesson.id });
+
+// List user's lessons
+const lessons = await trpc.lesson.list.query();
+```
 
 ## Code Style
 

@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import { useState } from "react";
 
+import { DashboardLayout } from "@/components/dashboard-layout";
 import { CreateLessonForm } from "./_components/create-lesson-form";
 import { EditLessonForm } from "./_components/edit-lesson-form";
 import { LessonList } from "./_components/lesson-list";
@@ -17,13 +18,13 @@ export default function LessonsPage() {
 
 	if (status === "loading") {
 		return (
-			<div className="container mx-auto px-4 py-8">
+			<DashboardLayout>
 				<div className="animate-pulse space-y-4">
 					<div className="h-8 w-1/2 rounded bg-gray-300 dark:bg-gray-600"></div>
 					<div className="h-4 w-3/4 rounded bg-gray-300 dark:bg-gray-600"></div>
 					<div className="h-64 rounded bg-gray-300 dark:bg-gray-600"></div>
 				</div>
-			</div>
+			</DashboardLayout>
 		);
 	}
 
@@ -54,8 +55,13 @@ export default function LessonsPage() {
 		setViewMode("edit");
 	};
 
+	const breadcrumbItems = [
+		{ label: "Dashboard", href: "/dashboard" },
+		{ label: "Lessons", isCurrentPage: true },
+	];
+
 	return (
-		<div className="container mx-auto px-4 py-8">
+		<DashboardLayout breadcrumbItems={breadcrumbItems}>
 			<div className="mb-8">
 				<h1 className="font-bold text-3xl text-gray-900 dark:text-gray-100">
 					Lesson Management
@@ -157,6 +163,6 @@ export default function LessonsPage() {
 					/>
 				)}
 			</div>
-		</div>
+		</DashboardLayout>
 	);
 }
