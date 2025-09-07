@@ -74,12 +74,19 @@ npm run preview       # Build and start production locally
 
 ## Recent Changes
 
-### Lesson Management System (v0.2.0)
+### Core Lesson Management System (v0.2.0) ✅ COMPLETED
+**Branch**: `001-core-lesson-management`
+- ✅ Implemented complete CRUD operations for lesson management
+- ✅ Full tRPC lesson router with lifecycle support (draft → published → archived → fork)
+- ✅ Lesson management UI at `/lessons` with list view and status indicators
+- ✅ Updated sidebar navigation with "Lessons" entry (removed mock entries)
+- ✅ Type-safe API contracts with comprehensive Zod validation
+- ✅ Integrated with existing Prisma Lesson model (no schema changes needed)
+- ✅ Business logic for state transitions and ownership validation
+- ✅ Error handling, logging, and user permission enforcement
+
+### Previous: Lesson Management System (v0.1.0) 
 **Branch**: `001-we-want-to`
 - Added Organization entity with tiered pricing (SMALL/MEDIUM/LARGE)
 - Implemented lesson versioning system with LessonVersion model
 - Added organization-based access control (OWNER/ADMIN/MEMBER roles)
-- Created lesson CRUD with copy/fork functionality
-- New tRPC routers: `organization` and `lesson`
-- Updated sidebar navigation to include "Lessons" entry
-- Multi-tenant architecture with data isolation per organization

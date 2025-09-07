@@ -1,6 +1,7 @@
 import "@/styles/globals.css";
 
 import type { Metadata } from "next";
+import { SessionProvider } from "next-auth/react";
 import { Geist } from "next/font/google";
 
 import { ThemeProvider } from "@/components/theme-provider";
@@ -23,14 +24,16 @@ export default function RootLayout({
 	return (
 		<html lang="en" suppressHydrationWarning className={`${geist.variable}`}>
 			<body>
-				<ThemeProvider
-					attribute="class"
-					defaultTheme="system"
-					enableSystem
-					disableTransitionOnChange
-				>
-					<TRPCReactProvider>{children}</TRPCReactProvider>
-				</ThemeProvider>
+				<SessionProvider>
+					<ThemeProvider
+						attribute="class"
+						defaultTheme="system"
+						enableSystem
+						disableTransitionOnChange
+					>
+						<TRPCReactProvider>{children}</TRPCReactProvider>
+					</ThemeProvider>
+				</SessionProvider>
 			</body>
 		</html>
 	);
