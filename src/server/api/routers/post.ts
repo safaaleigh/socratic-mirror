@@ -1,41 +1,39 @@
 import { z } from "zod";
 
 import {
-  createTRPCRouter,
-  protectedProcedure,
-  publicProcedure,
+	createTRPCRouter,
+	protectedProcedure,
+	publicProcedure,
 } from "@/server/api/trpc";
 
 export const postRouter = createTRPCRouter({
-  hello: publicProcedure
-    .input(z.object({ text: z.string() }))
-    .query(({ input }) => {
-      return {
-        greeting: `Hello ${input.text}`,
-      };
-    }),
+	hello: publicProcedure
+		.input(z.object({ text: z.string() }))
+		.query(({ input }) => {
+			return {
+				greeting: `Hello ${input.text}`,
+			};
+		}),
 
-  create: protectedProcedure
-    .input(z.object({ name: z.string().min(1) }))
-    .mutation(async ({ ctx, input }) => {
-      return ctx.db.post.create({
-        data: {
-          name: input.name,
-          createdBy: { connect: { id: ctx.session.user.id } },
-        },
-      });
-    }),
+	create: protectedProcedure
+		.input(z.object({ message: z.string().min(1) }))
+		.mutation(async ({ input }) => {
+			// Placeholder for post creation
+			// Since Post model doesn't exist in schema yet
+			return {
+				id: "placeholder",
+				message: input.message,
+				createdAt: new Date(),
+			};
+		}),
 
-  getLatest: protectedProcedure.query(async ({ ctx }) => {
-    const post = await ctx.db.post.findFirst({
-      orderBy: { createdAt: "desc" },
-      where: { createdBy: { id: ctx.session.user.id } },
-    });
+	getLatest: protectedProcedure.query(async () => {
+		// Placeholder for getting latest post
+		// Since Post model doesn't exist in schema yet
+		return null as { id: string; message: string; createdAt: Date } | null;
+	}),
 
-    return post ?? null;
-  }),
-
-  getSecretMessage: protectedProcedure.query(() => {
-    return "you can now see this secret message!";
-  }),
+	getSecretMessage: protectedProcedure.query(() => {
+		return "you can now see this secret message!";
+	}),
 });
