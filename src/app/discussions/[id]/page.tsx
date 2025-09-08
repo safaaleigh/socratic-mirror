@@ -27,11 +27,10 @@ import { InviteParticipantsModal } from "../_components/invite-participants-moda
 import { MessageInput } from "./_components/message-input";
 import { MessageList } from "./_components/message-list";
 
-interface Props {
-	params: { id: string };
-}
-
-export default function DiscussionPage({ params }: Props) {
+export default async function DiscussionPage(
+	props: PageProps<"/discussions/[id]">,
+) {
+	const params = await props.params;
 	const { data: session, status } = useSession();
 	const [inviteModalOpen, setInviteModalOpen] = useState(false);
 	const [replyToMessageId, setReplyToMessageId] = useState<string | null>(null);

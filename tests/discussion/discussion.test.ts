@@ -1,11 +1,19 @@
+import type { Lesson } from "@prisma/client";
 import type { Session } from "next-auth";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanupDatabase, createTestCaller, createTestUser } from "../db-setup";
+import {
+	cleanupDatabase,
+	createTestCaller,
+	createTestLesson,
+	createTestUser,
+	testDb,
+} from "../db-setup";
 
 describe("Discussion Router Contract Tests", () => {
 	let testUser: Awaited<ReturnType<typeof createTestUser>>;
 	let testSession: Session;
 	let caller: Awaited<ReturnType<typeof createTestCaller>>;
+	let testLesson: Lesson;
 
 	beforeEach(async () => {
 		await cleanupDatabase();
@@ -15,6 +23,7 @@ describe("Discussion Router Contract Tests", () => {
 			expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
 		};
 		caller = await createTestCaller(testSession);
+		testLesson = await createTestLesson(testUser.id);
 	});
 
 	afterEach(async () => {
@@ -24,7 +33,7 @@ describe("Discussion Router Contract Tests", () => {
 	describe("create", () => {
 		it("should create a new discussion from a lesson", async () => {
 			const input = {
-				lessonId: "test-lesson-id",
+				lessonId: testLesson.id,
 				name: "Test Discussion",
 				description: "Test discussion description",
 				maxParticipants: 10,
@@ -57,10 +66,22 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("update", () => {
+		let testDiscussion: any;
+
+		beforeEach(async () => {
+			// Create discussion via tRPC to ensure proper setup
+			testDiscussion = await caller.discussion.create({
+				lessonId: testLesson.id,
+				name: "Test Discussion",
+				description: "Test description",
+				maxParticipants: 10,
+				isPublic: false,
+			});
+		});
+
 		it("should update discussion details for creator", async () => {
-			const discussionId = "test-discussion-id";
 			const input = {
-				id: discussionId,
+				id: testDiscussion.id,
 				name: "Updated Discussion Name",
 				description: "Updated description",
 			};
@@ -68,7 +89,7 @@ describe("Discussion Router Contract Tests", () => {
 			const result = await caller.discussion.update(input);
 
 			expect(result).toMatchObject({
-				id: discussionId,
+				id: testDiscussion.id,
 				name: input.name,
 				description: input.description,
 			});
@@ -88,7 +109,7 @@ describe("Discussion Router Contract Tests", () => {
 
 			await expect(
 				nonCreatorCaller.discussion.update({
-					id: "test-discussion-id",
+					id: testDiscussion.id,
 					name: "Should Fail",
 				}),
 			).rejects.toThrow();
@@ -96,9 +117,22 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("close", () => {
+		let testDiscussion: any;
+
+		beforeEach(async () => {
+			// Create discussion via tRPC to ensure proper setup
+			testDiscussion = await caller.discussion.create({
+				lessonId: testLesson.id,
+				name: "Test Discussion",
+				description: "Test description",
+				maxParticipants: 10,
+				isPublic: false,
+			});
+		});
+
 		it("should close an active discussion", async () => {
 			const input = {
-				id: "test-discussion-id",
+				id: testDiscussion.id,
 			};
 
 			const result = await caller.discussion.close(input);
@@ -112,9 +146,22 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("getById", () => {
+		let testDiscussion: any;
+
+		beforeEach(async () => {
+			// Create discussion via tRPC to ensure proper setup
+			testDiscussion = await caller.discussion.create({
+				lessonId: testLesson.id,
+				name: "Test Discussion",
+				description: "Test description",
+				maxParticipants: 10,
+				isPublic: false,
+			});
+		});
+
 		it("should retrieve discussion details with computed fields", async () => {
 			const input = {
-				id: "test-discussion-id",
+				id: testDiscussion.id,
 			};
 
 			const result = await caller.discussion.getById(input);
@@ -134,6 +181,33 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("list", () => {
+		beforeEach(async () => {
+			// Create some test discussions
+			await testDb.discussion.create({
+				data: {
+					lessonId: testLesson.id,
+					name: "Test Discussion 1",
+					description: "Test description 1",
+					creatorId: testUser.id,
+					maxParticipants: 10,
+					isPublic: false,
+					isActive: true,
+				},
+			});
+
+			await testDb.discussion.create({
+				data: {
+					lessonId: testLesson.id,
+					name: "Test Discussion 2",
+					description: "Test description 2",
+					creatorId: testUser.id,
+					maxParticipants: 10,
+					isPublic: false,
+					isActive: true,
+				},
+			});
+		});
+
 		it("should list discussions with pagination", async () => {
 			const input = {
 				role: "all" as const,
@@ -170,9 +244,22 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("generateJoinCode", () => {
+		let testDiscussion: any;
+
+		beforeEach(async () => {
+			// Create discussion via tRPC to ensure proper setup
+			testDiscussion = await caller.discussion.create({
+				lessonId: testLesson.id,
+				name: "Test Discussion",
+				description: "Test description",
+				maxParticipants: 10,
+				isPublic: false,
+			});
+		});
+
 		it("should generate a unique join code", async () => {
 			const input = {
-				discussionId: "test-discussion-id",
+				discussionId: testDiscussion.id,
 			};
 
 			const result = await caller.discussion.generateJoinCode(input);
@@ -185,20 +272,44 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("join", () => {
-		it("should allow joining with valid join code", async () => {
-			const input = {
-				joinCode: "TESTCODE",
-			};
+		let testDiscussion: any;
+		let joinCode: string;
 
-			const result = await caller.discussion.join(input);
+		beforeEach(async () => {
+			// Create discussion via tRPC to ensure proper setup
+			testDiscussion = await caller.discussion.create({
+				lessonId: testLesson.id,
+				name: "Test Discussion",
+				description: "Test description",
+				maxParticipants: 10,
+				isPublic: false,
+			});
+
+			// Generate a join code
+			const result = await caller.discussion.generateJoinCode({
+				discussionId: testDiscussion.id,
+			});
+			joinCode = result.joinCode;
+		});
+
+		it("should allow joining with valid join code", async () => {
+			// Create a different user to join
+			const newUser = await createTestUser();
+			const newSession: Session = {
+				user: { id: newUser.id, email: newUser.email, name: newUser.name },
+				expires: testSession.expires,
+			};
+			const newCaller = await createTestCaller(newSession);
+
+			const result = await newCaller.discussion.join({ joinCode });
 
 			expect(result).toMatchObject({
 				discussion: expect.objectContaining({
-					id: expect.any(String),
-					name: expect.any(String),
+					id: testDiscussion.id,
+					name: testDiscussion.name,
 				}),
 				participant: expect.objectContaining({
-					userId: testUser.id,
+					userId: newUser.id,
 					role: expect.any(String),
 					status: "ACTIVE",
 				}),
@@ -213,12 +324,45 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("leave", () => {
+		let testDiscussion: any;
+		let participantUser: Awaited<ReturnType<typeof createTestUser>>;
+		let participantCaller: any;
+
+		beforeEach(async () => {
+			// Create discussion via tRPC to ensure proper setup
+			testDiscussion = await caller.discussion.create({
+				lessonId: testLesson.id,
+				name: "Test Discussion",
+				description: "Test description",
+				maxParticipants: 10,
+				isPublic: false,
+			});
+
+			// Generate a join code
+			const { joinCode } = await caller.discussion.generateJoinCode({
+				discussionId: testDiscussion.id,
+			});
+
+			// Create a new user and have them join
+			participantUser = await createTestUser();
+			const participantSession: Session = {
+				user: {
+					id: participantUser.id,
+					email: participantUser.email,
+					name: participantUser.name,
+				},
+				expires: testSession.expires,
+			};
+			participantCaller = await createTestCaller(participantSession);
+			await participantCaller.discussion.join({ joinCode });
+		});
+
 		it("should allow participants to leave discussion", async () => {
 			const input = {
-				discussionId: "test-discussion-id",
+				discussionId: testDiscussion.id,
 			};
 
-			const result = await caller.discussion.leave(input);
+			const result = await participantCaller.discussion.leave(input);
 
 			expect(result).toMatchObject({
 				success: true,
@@ -227,9 +371,22 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("getParticipants", () => {
+		let testDiscussion: any;
+
+		beforeEach(async () => {
+			// Create discussion via tRPC to ensure proper setup
+			testDiscussion = await caller.discussion.create({
+				lessonId: testLesson.id,
+				name: "Test Discussion",
+				description: "Test description",
+				maxParticipants: 10,
+				isPublic: false,
+			});
+		});
+
 		it("should retrieve list of participants", async () => {
 			const input = {
-				id: "test-discussion-id",
+				id: testDiscussion.id,
 			};
 
 			const result = await caller.discussion.getParticipants(input);
@@ -254,10 +411,36 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("removeParticipant", () => {
+		let testDiscussion: any;
+		let participantUser: Awaited<ReturnType<typeof createTestUser>>;
+		let participantRecord: any;
+
+		beforeEach(async () => {
+			// Create discussion via tRPC to ensure proper setup
+			testDiscussion = await caller.discussion.create({
+				lessonId: testLesson.id,
+				name: "Test Discussion",
+				description: "Test description",
+				maxParticipants: 10,
+				isPublic: false,
+			});
+
+			// Add another participant to remove
+			participantUser = await createTestUser();
+			participantRecord = await testDb.discussionParticipant.create({
+				data: {
+					discussionId: testDiscussion.id,
+					userId: participantUser.id,
+					role: "PARTICIPANT",
+					status: "ACTIVE",
+				},
+			});
+		});
+
 		it("should allow moderators to remove participants", async () => {
 			const input = {
-				discussionId: "test-discussion-id",
-				participantId: "participant-to-remove",
+				discussionId: testDiscussion.id,
+				participantId: participantRecord.id, // Use the DiscussionParticipant.id, not userId
 				reason: "Violation of discussion rules",
 			};
 
@@ -270,17 +453,43 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("updateParticipantRole", () => {
+		let testDiscussion: any;
+		let participantUser: Awaited<ReturnType<typeof createTestUser>>;
+		let participantRecord: any;
+
+		beforeEach(async () => {
+			// Create discussion via tRPC to ensure proper setup
+			testDiscussion = await caller.discussion.create({
+				lessonId: testLesson.id,
+				name: "Test Discussion",
+				description: "Test description",
+				maxParticipants: 10,
+				isPublic: false,
+			});
+
+			// Add another participant to update
+			participantUser = await createTestUser();
+			participantRecord = await testDb.discussionParticipant.create({
+				data: {
+					discussionId: testDiscussion.id,
+					userId: participantUser.id,
+					role: "PARTICIPANT",
+					status: "ACTIVE",
+				},
+			});
+		});
+
 		it("should allow creator to update participant roles", async () => {
 			const input = {
-				discussionId: "test-discussion-id",
-				participantId: "participant-id",
+				discussionId: testDiscussion.id,
+				participantId: participantRecord.id, // Use the DiscussionParticipant.id, not userId
 				role: "MODERATOR" as const,
 			};
 
 			const result = await caller.discussion.updateParticipantRole(input);
 
 			expect(result).toMatchObject({
-				userId: input.participantId,
+				userId: participantUser.id, // Check the actual userId
 				role: input.role,
 			});
 		});

@@ -66,3 +66,22 @@ export async function createTestCaller(session?: Session | null) {
 	const ctx = createTestContext(session);
 	return createCallerFactory(appRouter)(ctx);
 }
+
+// Helper to create a test lesson
+export async function createTestLesson(userId: string) {
+	return await testDb.lesson.create({
+		data: {
+			title: "Test Lesson",
+			description: "Test lesson description",
+			content: "Test lesson content",
+			objectives: ["Test objective 1", "Test objective 2"],
+			keyQuestions: ["Test question 1", "Test question 2"],
+			facilitationStyle: "analytical",
+			suggestedDuration: 45,
+			suggestedGroupSize: 4,
+			isPublished: true,
+			isArchived: false,
+			creatorId: userId,
+		},
+	});
+}
