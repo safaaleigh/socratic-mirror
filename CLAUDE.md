@@ -122,6 +122,7 @@ Delete    Delete    Delete
 - **Unit Tests**: 42 tests covering all CRUD operations, lifecycle transitions, validation, and error cases
 - **E2E Tests**: 21 Playwright tests covering complete user workflows across browsers
 - **Performance Tests**: 11 tests validating <2s response times (avg 313ms)
+- **Integration Tests**: Comprehensive quickstart validation in `/tests/integration/quickstart-validation.test.ts`
 
 #### Usage Examples
 ```typescript
@@ -142,6 +143,21 @@ await trpc.lesson.publish.mutate({ id: lesson.id });
 
 // List user's lessons
 const lessons = await trpc.lesson.list.query();
+
+// Archive lesson (published only)
+await trpc.lesson.archive.mutate({ id: lesson.id });
+
+// Fork archived lesson
+const forkedLesson = await trpc.lesson.fork.mutate({
+  id: archivedLesson.id,
+  newTitle: "New Version of Lesson"
+});
+
+// Delete lesson with discussion handling
+await trpc.lesson.delete.mutate({
+  id: lesson.id,
+  handleActiveDiscussions: "complete" // or "cancel"
+});
 ```
 
 ## Code Style

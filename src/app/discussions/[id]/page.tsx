@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { notFound, redirect } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -27,10 +27,19 @@ import { InviteParticipantsModal } from "../_components/invite-participants-moda
 import { MessageInput } from "./_components/message-input";
 import { MessageList } from "./_components/message-list";
 
-export default async function DiscussionPage(
-	props: PageProps<"/discussions/[id]">,
-) {
-	const params = await props.params;
+export default function DiscussionPage({
+	params,
+}: {
+	params: Promise<{ id: string }>;
+}) {
+	const [paramsResolved, setParamsResolved] = useState<{ id: string } | null>(
+		null,
+	);
+
+	// Resolve params on mount
+	useEffect(() => {
+		params.then(setParamsResolved);
+	}, [params]);
 	const { data: session, status } = useSession();
 	const [inviteModalOpen, setInviteModalOpen] = useState(false);
 	const [replyToMessageId, setReplyToMessageId] = useState<string | null>(null);
@@ -40,31 +49,49 @@ export default async function DiscussionPage(
 		data: discussion,
 		isLoading,
 		error,
-	} = api.discussion.getById.useQuery({
-		id: params.id,
-	});
+	} = api.discussion.getById.useQuery(
+		{
+			id: paramsResolved?.id ?? "",
+		},
+		{
+			enabled: !!paramsResolved?.id,
+		},
+	);
 
-	const { data: participants } = api.discussion.getParticipants.useQuery({
-		id: params.id,
-	});
+	const { data: participants } = api.discussion.getParticipants.useQuery(
+		{
+			id: paramsResolved?.id ?? "",
+		},
+		{
+			enabled: !!paramsResolved?.id,
+		},
+	);
 
 	const utils = api.useUtils();
 
 	const joinDiscussionMutation = api.discussion.join.useMutation({
 		onSuccess: () => {
-			void utils.discussion.getById.invalidate({ id: params.id });
-			void utils.discussion.getParticipants.invalidate({ id: params.id });
+			if (paramsResolved?.id) {
+				void utils.discussion.getById.invalidate({ id: paramsResolved.id });
+				void utils.discussion.getParticipants.invalidate({
+					id: paramsResolved.id,
+				});
+			}
 		},
 	});
 
 	const leaveDiscussionMutation = api.discussion.leave.useMutation({
 		onSuccess: () => {
-			void utils.discussion.getById.invalidate({ id: params.id });
-			void utils.discussion.getParticipants.invalidate({ id: params.id });
+			if (paramsResolved?.id) {
+				void utils.discussion.getById.invalidate({ id: paramsResolved.id });
+				void utils.discussion.getParticipants.invalidate({
+					id: paramsResolved.id,
+				});
+			}
 		},
 	});
 
-	if (status === "loading" || isLoading) {
+	if (status === "loading" || isLoading || !paramsResolved) {
 		return (
 			<DashboardLayout>
 				<div className="space-y-4">
@@ -113,12 +140,16 @@ export default async function DiscussionPage(
 			(participantsList?.length ?? 0) < discussion.maxParticipants);
 
 	const handleJoin = () => {
-		joinDiscussionMutation.mutate({ discussionId: params.id });
+		if (paramsResolved?.id) {
+			joinDiscussionMutation.mutate({ discussionId: paramsResolved.id });
+		}
 	};
 
 	const handleLeave = () => {
 		if (confirm("Are you sure you want to leave this discussion?")) {
-			leaveDiscussionMutation.mutate({ discussionId: params.id });
+			if (paramsResolved?.id) {
+				leaveDiscussionMutation.mutate({ discussionId: paramsResolved.id });
+			}
 		}
 	};
 
@@ -233,7 +264,7 @@ export default async function DiscussionPage(
 							<div className="flex-1 space-y-4 overflow-y-auto p-4">
 								{isParticipant ? (
 									<MessageList
-										discussionId={params.id}
+										discussionId={paramsResolved?.id ?? ""}
 										onReplyToMessage={handleReplyToMessage}
 									/>
 								) : (
@@ -258,7 +289,7 @@ export default async function DiscussionPage(
 							{/* Message Input */}
 							{isParticipant && (
 								<MessageInput
-									discussionId={params.id}
+									discussionId={paramsResolved?.id ?? ""}
 									replyToMessageId={replyToMessageId || undefined}
 									replyToContent={replyToContent || undefined}
 									onSent={() => {
@@ -345,7 +376,7 @@ export default async function DiscussionPage(
 											<span className="truncate text-sm">
 												{participant.user?.name || "Unknown User"}
 											</span>
-											{participant.role === "moderator" && (
+											{participant.role === "MODERATOR" && (
 												<Badge variant="secondary" className="text-xs">
 													Mod
 												</Badge>
@@ -365,12 +396,14 @@ export default async function DiscussionPage(
 			</DashboardLayout>
 
 			{/* Invite Modal */}
-			<InviteParticipantsModal
-				discussionId={params.id}
-				discussionTitle={discussion.name}
-				isOpen={inviteModalOpen}
-				onOpenChange={setInviteModalOpen}
-			/>
+			{paramsResolved?.id && (
+				<InviteParticipantsModal
+					discussionId={paramsResolved.id}
+					discussionTitle={discussion.name}
+					isOpen={inviteModalOpen}
+					onOpenChange={setInviteModalOpen}
+				/>
+			)}
 		</>
 	);
 }

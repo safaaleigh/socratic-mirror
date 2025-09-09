@@ -3,9 +3,13 @@ import { aiService } from "@/server/services/ai-facilitator";
 import { emailService } from "@/server/services/email";
 import { getWebSocketService } from "@/server/services/websocket";
 import type {
+	Discussion,
+	DiscussionParticipant,
+	Lesson,
 	MessageType,
 	ParticipantRole,
 	ParticipantStatus,
+	User,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -61,8 +65,22 @@ function generateJoinCode(): string {
 	return code;
 }
 
+type DiscussionWithRelations = Discussion & {
+	creator?: Pick<User, "id" | "name" | "email" | "image"> | User | null;
+	lesson?:
+		| Pick<
+				Lesson,
+				"id" | "title" | "description" | "objectives" | "facilitationStyle"
+		  >
+		| Lesson
+		| null;
+	_count?: {
+		participants?: number;
+	};
+};
+
 function formatDiscussionOutput(
-	discussion: any,
+	discussion: DiscussionWithRelations,
 	userRole?: ParticipantRole,
 	currentUserId?: string,
 ) {
@@ -90,7 +108,11 @@ function formatDiscussionOutput(
 	};
 }
 
-function formatParticipantOutput(participant: any) {
+type ParticipantWithUser = DiscussionParticipant & {
+	user?: Pick<User, "id" | "name" | "email" | "image"> | User | null;
+};
+
+function formatParticipantOutput(participant: ParticipantWithUser) {
 	return {
 		id: participant.id,
 		userId: participant.userId,
@@ -394,14 +416,18 @@ export const discussionRouter = createTRPCRouter({
 				});
 			}
 
-			return formatDiscussionOutput(discussion, participant.role, ctx.session.user.id);
+			return formatDiscussionOutput(
+				discussion,
+				participant.role,
+				ctx.session.user.id,
+			);
 		}),
 
 	// List discussions (filtered by role)
 	list: protectedProcedure
 		.input(listDiscussionsSchema)
 		.query(async ({ ctx, input }) => {
-			const where: any = {};
+			const where: Record<string, unknown> = {};
 
 			if (input.role === "creator") {
 				where.creatorId = ctx.session.user.id;
@@ -700,7 +726,11 @@ export const discussionRouter = createTRPCRouter({
 			}
 
 			return {
-				discussion: formatDiscussionOutput(discussion, "PARTICIPANT", ctx.session.user.id),
+				discussion: formatDiscussionOutput(
+					discussion,
+					"PARTICIPANT",
+					ctx.session.user.id,
+				),
 				participant: formatParticipantOutput(participant),
 			};
 		}),

@@ -1,4 +1,4 @@
-import type { Lesson } from "@prisma/client";
+import type { Discussion, Lesson } from "@prisma/client";
 import type { Session } from "next-auth";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -64,7 +64,7 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("update", () => {
-		let testDiscussion: any;
+		let testDiscussion: Awaited<ReturnType<typeof caller.discussion.create>>;
 
 		beforeEach(async () => {
 			// Create discussion via tRPC to ensure proper setup
@@ -115,7 +115,7 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("close", () => {
-		let testDiscussion: any;
+		let testDiscussion: Awaited<ReturnType<typeof caller.discussion.create>>;
 
 		beforeEach(async () => {
 			// Create discussion via tRPC to ensure proper setup
@@ -144,7 +144,7 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("getById", () => {
-		let testDiscussion: any;
+		let testDiscussion: Awaited<ReturnType<typeof caller.discussion.create>>;
 
 		beforeEach(async () => {
 			// Create discussion via tRPC to ensure proper setup
@@ -242,7 +242,7 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("generateJoinCode", () => {
-		let testDiscussion: any;
+		let testDiscussion: Awaited<ReturnType<typeof caller.discussion.create>>;
 
 		beforeEach(async () => {
 			// Create discussion via tRPC to ensure proper setup
@@ -270,7 +270,7 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("join", () => {
-		let testDiscussion: any;
+		let testDiscussion: Awaited<ReturnType<typeof caller.discussion.create>>;
 		let joinCode: string;
 
 		beforeEach(async () => {
@@ -322,7 +322,7 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("leave", () => {
-		let testDiscussion: any;
+		let testDiscussion: Awaited<ReturnType<typeof caller.discussion.create>>;
 		let participantUser: Awaited<ReturnType<typeof createTestUser>>;
 		let participantCaller: Awaited<ReturnType<typeof createTestCaller>>;
 
@@ -369,7 +369,7 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("getParticipants", () => {
-		let testDiscussion: any;
+		let testDiscussion: Awaited<ReturnType<typeof caller.discussion.create>>;
 
 		beforeEach(async () => {
 			// Create discussion via tRPC to ensure proper setup
@@ -409,9 +409,15 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("removeParticipant", () => {
-		let testDiscussion: any;
+		let testDiscussion: Awaited<ReturnType<typeof caller.discussion.create>>;
 		let participantUser: Awaited<ReturnType<typeof createTestUser>>;
-		let participantRecord: any;
+		let participantRecord: {
+			id: string;
+			userId: string;
+			discussionId: string;
+			role: string;
+			status: string;
+		};
 
 		beforeEach(async () => {
 			// Create discussion via tRPC to ensure proper setup
@@ -451,9 +457,15 @@ describe("Discussion Router Contract Tests", () => {
 	});
 
 	describe("updateParticipantRole", () => {
-		let testDiscussion: any;
+		let testDiscussion: Awaited<ReturnType<typeof caller.discussion.create>>;
 		let participantUser: Awaited<ReturnType<typeof createTestUser>>;
-		let participantRecord: any;
+		let participantRecord: {
+			id: string;
+			userId: string;
+			discussionId: string;
+			role: string;
+			status: string;
+		};
 
 		beforeEach(async () => {
 			// Create discussion via tRPC to ensure proper setup

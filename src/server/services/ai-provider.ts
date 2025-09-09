@@ -169,7 +169,7 @@ Important: Respond with ONLY the JSON object, no explanatory text.`;
 			});
 
 			// Try to extract and fix JSON from the response
-			let jsonString = this.extractAndCleanJSON(textResponse);
+			const jsonString = this.extractAndCleanJSON(textResponse);
 			if (!jsonString) {
 				throw new Error("No JSON object found in response");
 			}
@@ -178,9 +178,29 @@ Important: Respond with ONLY the JSON object, no explanatory text.`;
 			try {
 				parsedObject = JSON.parse(jsonString);
 			} catch (jsonError) {
+				console.error("Initial JSON parse error:", jsonError);
+				console.log(
+					"Problematic JSON (first 1000 chars):",
+					jsonString.slice(0, 1000),
+				);
+				console.log("Attempting to fix common JSON issues...");
+
 				// Try to fix common JSON issues and retry
-				jsonString = this.fixCommonJSONIssues(jsonString);
-				parsedObject = JSON.parse(jsonString);
+				const fixedJsonString = this.fixCommonJSONIssues(jsonString);
+
+				try {
+					parsedObject = JSON.parse(fixedJsonString);
+					console.log("Successfully parsed JSON after fixes");
+				} catch (retryError) {
+					console.error("JSON parse failed even after fixes:", retryError);
+					console.log(
+						"Fixed JSON (first 1000 chars):",
+						fixedJsonString.slice(0, 1000),
+					);
+					throw new Error(
+						`JSON parsing failed: ${retryError instanceof Error ? retryError.message : String(retryError)}`,
+					);
+				}
 			}
 
 			// Validate and sanitize the response for facilitation schema
@@ -229,42 +249,95 @@ Important: Respond with ONLY the JSON object, no explanatory text.`;
 	}
 
 	private extractAndCleanJSON(text: string): string | null {
-		// Try to find a JSON object in the text
-		const jsonMatch = text.match(/\{[\s\S]*\}/);
-		if (!jsonMatch) {
+		// Try to find a JSON object in the text using balanced brace matching
+		const startIndex = text.indexOf("{");
+		if (startIndex === -1) {
 			return null;
 		}
 
-		let jsonString = jsonMatch[0];
+		let braceCount = 0;
+		let endIndex = startIndex;
+		let inString = false;
+		let escaped = false;
 
-		// Clean up common issues
-		jsonString = jsonString.trim();
+		for (let i = startIndex; i < text.length; i++) {
+			const char = text[i];
 
-		return jsonString;
+			if (escaped) {
+				escaped = false;
+				continue;
+			}
+
+			if (char === "\\") {
+				escaped = true;
+				continue;
+			}
+
+			if (char === '"') {
+				inString = !inString;
+				continue;
+			}
+
+			if (!inString) {
+				if (char === "{") {
+					braceCount++;
+				} else if (char === "}") {
+					braceCount--;
+					if (braceCount === 0) {
+						endIndex = i + 1;
+						break;
+					}
+				}
+			}
+		}
+
+		if (braceCount !== 0) {
+			// Fallback to simple regex if balanced matching fails
+			const jsonMatch = text.match(/\{[\s\S]*\}/);
+			if (!jsonMatch) {
+				return null;
+			}
+			return jsonMatch[0].trim();
+		}
+
+		const jsonString = text.substring(startIndex, endIndex);
+		return jsonString.trim();
 	}
 
 	private fixCommonJSONIssues(jsonString: string): string {
 		let fixed = jsonString;
 
-		// Fix trailing commas in arrays
+		// Fix trailing commas in arrays and objects
 		fixed = fixed.replace(/,(\s*[\]\}])/g, "$1");
 
-		// Fix unescaped quotes in strings
+		// Fix missing commas between array elements and objects
+		fixed = fixed.replace(/"\s*"\s*(?=["\[])/g, '", "');
+		fixed = fixed.replace(/(\]|\})\s*(?=[\{\[])/g, "$1, ");
+
+		// Fix unescaped quotes in strings (more robust pattern)
 		fixed = fixed.replace(
-			/"([^"]*)"([^",:}\]]*)"([^"]*)":/g,
-			'"$1\\"$2\\"$3":',
+			/"([^"\\]*(\\.[^"\\]*)*)"([^",:}\]]*)"([^"\\]*(\\.[^"\\]*)*)":/g,
+			'"$1\\"$3\\"$4":',
 		);
 
 		// Fix missing quotes around keys
 		fixed = fixed.replace(/(\w+):/g, '"$1":');
 
-		// Remove extra commas
+		// Remove multiple consecutive commas
 		fixed = fixed.replace(/,,+/g, ",");
 
-		// Fix empty array elements
+		// Fix array formatting issues
 		fixed = fixed.replace(/,\s*,/g, ",");
 		fixed = fixed.replace(/\[\s*,/g, "[");
 		fixed = fixed.replace(/,\s*\]/g, "]");
+
+		// Fix object formatting issues
+		fixed = fixed.replace(/\{\s*,/g, "{");
+		fixed = fixed.replace(/,\s*\}/g, "}");
+
+		// Fix spacing around colons and commas for better readability
+		fixed = fixed.replace(/\s*:\s*/g, ": ");
+		fixed = fixed.replace(/,(?!\s)/g, ", ");
 
 		return fixed;
 	}

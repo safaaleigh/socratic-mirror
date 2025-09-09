@@ -78,11 +78,11 @@ export function EditLessonForm({
 		if (lesson) {
 			setFormData({
 				title: lesson.title,
-				description: lesson.description,
+				description: lesson.description || "",
 				content: lesson.content,
 				objectives: lesson.objectives,
 				keyQuestions: lesson.keyQuestions,
-				facilitationStyle: lesson.facilitationStyle,
+				facilitationStyle: lesson.facilitationStyle as FacilitationStyle,
 				suggestedDuration: lesson.suggestedDuration || undefined,
 				suggestedGroupSize: lesson.suggestedGroupSize,
 			});

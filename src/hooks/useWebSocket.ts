@@ -163,7 +163,7 @@ export function useWebSocket({
 						break;
 
 					case "user_joined":
-						if (event.data && 'user' in event.data && event.data.user) {
+						if (event.data && "user" in event.data && event.data.user) {
 							const user = event.data.user as ConnectedUser;
 							onUserJoined?.(user);
 							setConnectedUsers((prev) => {
@@ -174,26 +174,30 @@ export function useWebSocket({
 						break;
 
 					case "user_left":
-						if (event.data && 'userId' in event.data && event.data.userId) {
+						if (event.data && "userId" in event.data && event.data.userId) {
 							const userId = event.data.userId as string;
 							onUserLeft?.(userId);
-							setConnectedUsers((prev) =>
-								prev.filter((u) => u.id !== userId),
-							);
+							setConnectedUsers((prev) => prev.filter((u) => u.id !== userId));
 						}
 						break;
 
 					case "typing": {
-						const users = (event.data && 'users' in event.data ? event.data.users : []) as TypingUser[];
+						const users = (
+							event.data && "users" in event.data ? event.data.users : []
+						) as TypingUser[];
 						setTypingUsers(users);
 						onTypingUpdate?.(users);
 						break;
 					}
 
-					case "ai_thinking":
-						const isThinking = event.data && 'isThinking' in event.data ? event.data.isThinking === true : false;
+					case "ai_thinking": {
+						const isThinking =
+							event.data && "isThinking" in event.data
+								? event.data.isThinking === true
+								: false;
 						onAIThinking?.(isThinking);
 						break;
+					}
 				}
 			} else if (message.type === "pong") {
 				// Heartbeat response - connection is alive

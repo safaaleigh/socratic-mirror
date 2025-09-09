@@ -1,3 +1,4 @@
+import type { Lesson } from "@prisma/client";
 import type { Session } from "next-auth";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -11,9 +12,9 @@ describe("lesson.update tRPC procedure", () => {
 	let testUser: Awaited<ReturnType<typeof createTestUser>>;
 	let otherUser: Awaited<ReturnType<typeof createTestUser>>;
 	let testSession: Session;
-	let draftLesson: any;
-	let publishedLesson: any;
-	let archivedLesson: any;
+	let draftLesson: Lesson;
+	let publishedLesson: Lesson;
+	let archivedLesson: Lesson;
 
 	beforeEach(async () => {
 		await cleanupDatabase();
@@ -212,7 +213,7 @@ describe("lesson.update tRPC procedure", () => {
 
 		const updateData = {
 			id: draftLesson.id,
-			facilitationStyle: "invalid-style" as any,
+			facilitationStyle: "invalid-style" as "exploratory",
 		};
 
 		await expect(caller.lesson.update(updateData)).rejects.toThrow(

@@ -1,5 +1,5 @@
 import { createId } from "@paralleldrive/cuid2";
-import type { Lesson } from "@prisma/client";
+import type { Discussion, Lesson } from "@prisma/client";
 import type { Session } from "next-auth";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -15,7 +15,16 @@ describe("Invitation Router Contract Tests", () => {
 	let testSession: Session;
 	let caller: Awaited<ReturnType<typeof createTestCaller>>;
 	let testLesson: Lesson;
-	let testDiscussion: any;
+	let testDiscussion: {
+		id: string;
+		name: string;
+		description: string | null;
+		creatorId: string;
+		lessonId: string | null;
+		maxParticipants: number;
+		isPublic: boolean;
+		isActive: boolean;
+	};
 
 	beforeEach(async () => {
 		await cleanupDatabase();
@@ -85,7 +94,7 @@ describe("Invitation Router Contract Tests", () => {
 				],
 			};
 
-				await expect(
+			await expect(
 				caller.invitation.sendInvitations(invalidInput),
 			).rejects.toThrow();
 		});

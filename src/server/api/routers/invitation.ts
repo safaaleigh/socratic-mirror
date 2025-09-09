@@ -780,7 +780,7 @@ export const invitationRouter = createTRPCRouter({
 	list: protectedProcedure
 		.input(listInvitationsSchema)
 		.query(async ({ ctx, input }) => {
-			const where: any = {};
+			const where: Record<string, unknown> = {};
 
 			if (input.discussionId) {
 				// Check if user has permission to view invitations for this discussion

@@ -12,10 +12,10 @@ import {
 type TestDiscussion = {
 	id: string;
 	name: string;
-	description?: string;
+	description: string | null;
 	isActive: boolean;
 	maxParticipants: number;
-	lessonId: string;
+	lessonId: string | null;
 	createdById: string;
 };
 
@@ -103,7 +103,7 @@ describe("Message Router Contract Tests", () => {
 				content: "", // Empty content should fail
 			};
 
-				await expect(caller.message.send(invalidInput)).rejects.toThrow();
+			await expect(caller.message.send(invalidInput)).rejects.toThrow();
 		});
 
 		it("should reject messages to non-existent discussion", async () => {
@@ -112,7 +112,7 @@ describe("Message Router Contract Tests", () => {
 				content: "This should fail",
 			};
 
-				await expect(caller.message.send(input)).rejects.toThrow();
+			await expect(caller.message.send(input)).rejects.toThrow();
 		});
 	});
 

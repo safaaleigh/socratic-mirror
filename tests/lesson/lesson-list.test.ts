@@ -122,8 +122,8 @@ describe("lesson.list tRPC procedure", () => {
 		const result = await caller.lesson.list();
 
 		expect(result).toHaveLength(1);
-		expect(result[0].title).toBe("User Lesson");
-		expect(result[0].creatorId).toBe(testUser.id);
+		expect(result[0]?.title).toBe("User Lesson");
+		expect(result[0]?.creatorId).toBe(testUser.id);
 	});
 
 	it("should reject unauthenticated requests", async () => {
@@ -161,7 +161,7 @@ describe("lesson.list tRPC procedure", () => {
 		const result = await caller.lesson.list();
 
 		expect(result).toHaveLength(2);
-		expect(result[0].id).toBe(newLesson.id); // Most recent first
-		expect(result[1].id).toBe(oldLesson.id);
+		expect(result[0]?.id).toBe(newLesson.id); // Most recent first
+		expect(result[1]?.id).toBe(oldLesson.id);
 	});
 });

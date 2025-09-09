@@ -21,10 +21,12 @@ Avatar.displayName = "Avatar";
 const AvatarImage = React.forwardRef<
 	HTMLImageElement,
 	React.ImgHTMLAttributes<HTMLImageElement> & { alt: string }
->(({ className, ...props }, ref) => (
+>(({ className, alt, ...props }, ref) => (
+	// biome-ignore lint/a11y/useAltText: alt is explicitly required in props and passed to img
 	<img
 		ref={ref}
 		className={cn("aspect-square h-full w-full", className)}
+		alt={alt}
 		{...props}
 	/>
 ));

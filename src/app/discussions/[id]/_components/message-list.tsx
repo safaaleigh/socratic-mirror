@@ -17,7 +17,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { type MessageEvent, useWebSocket } from "@/hooks/useWebSocket";
 import { api } from "@/trpc/react";
-import { type MessageType } from "@prisma/client";
+import type { MessageType } from "@prisma/client";
 import {
 	AlertCircle,
 	Bot,
@@ -37,12 +37,15 @@ type MessageData = {
 	id: string;
 	discussionId: string;
 	authorId: string | null;
-	author: {
-		id: string;
-		name: string | null;
-		email: string;
-		image: string | null;
-	} | null | undefined;
+	author:
+		| {
+				id: string;
+				name: string | null;
+				email: string;
+				image: string | null;
+		  }
+		| null
+		| undefined;
 	content: string;
 	type: MessageType;
 	parentId: string | null;

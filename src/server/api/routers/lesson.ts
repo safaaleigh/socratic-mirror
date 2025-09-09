@@ -1,3 +1,4 @@
+import type { Lesson } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -49,10 +50,7 @@ const forkLessonSchema = z.object({
 });
 
 // Helper function to compute lesson status and permissions
-function computeLessonMetadata(
-	lesson: any,
-	currentUserId: string,
-) {
+function computeLessonMetadata(lesson: Lesson, currentUserId: string) {
 	const isOwner = lesson.creatorId === currentUserId;
 
 	let status: "draft" | "published" | "archived";
