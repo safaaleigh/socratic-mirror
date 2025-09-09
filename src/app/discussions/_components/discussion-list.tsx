@@ -24,6 +24,21 @@ import {
 	Users,
 } from "lucide-react";
 
+// Type for discussion data
+type DiscussionData = {
+	id: string;
+	name: string;
+	description?: string | null;
+	isActive: boolean;
+	participantCount?: number;
+	maxParticipants?: number | null;
+	createdAt: Date;
+	isCreator: boolean;
+	lesson?: {
+		title: string;
+	} | null;
+};
+
 export function DiscussionList({
 	onViewDiscussion,
 	onInviteParticipants,
@@ -44,13 +59,21 @@ export function DiscussionList({
 			<Card>
 				<CardContent className="p-6">
 					<div className="space-y-4">
-						{[...Array(3)].map((_, i) => (
-							<div key={i} className="space-y-2">
-								<Skeleton className="h-4 w-3/4" />
-								<Skeleton className="h-3 w-1/2" />
-								<Skeleton className="h-3 w-1/4" />
-							</div>
-						))}
+						<div key="discussion-skeleton-1" className="space-y-2">
+							<Skeleton className="h-4 w-3/4" />
+							<Skeleton className="h-3 w-1/2" />
+							<Skeleton className="h-3 w-1/4" />
+						</div>
+						<div key="discussion-skeleton-2" className="space-y-2">
+							<Skeleton className="h-4 w-3/4" />
+							<Skeleton className="h-3 w-1/2" />
+							<Skeleton className="h-3 w-1/4" />
+						</div>
+						<div key="discussion-skeleton-3" className="space-y-2">
+							<Skeleton className="h-4 w-3/4" />
+							<Skeleton className="h-3 w-1/2" />
+							<Skeleton className="h-3 w-1/4" />
+						</div>
 					</div>
 				</CardContent>
 			</Card>
@@ -119,12 +142,6 @@ export function DiscussionList({
 										<Users className="h-3 w-3" />
 										{discussion.participantCount || 0} participants
 									</span>
-									{discussion.messageCount !== undefined && (
-										<span className="flex items-center gap-1">
-											<MessageCircle className="h-3 w-3" />
-											{discussion.messageCount} messages
-										</span>
-									)}
 									{discussion.maxParticipants && (
 										<span className="text-muted-foreground">
 											Max: {discussion.maxParticipants}
@@ -181,7 +198,7 @@ function DiscussionActions({
 	onInvite,
 	onManage,
 }: {
-	discussion: any;
+	discussion: DiscussionData;
 	onView?: (discussionId: string) => void;
 	onInvite?: (discussionId: string) => void;
 	onManage?: (discussionId: string) => void;

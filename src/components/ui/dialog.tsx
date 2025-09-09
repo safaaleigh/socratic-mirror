@@ -25,6 +25,14 @@ const Dialog: React.FC<{
 					<div
 						className="fixed inset-0 bg-black/50"
 						onClick={() => onOpenChange(false)}
+						onKeyDown={(e) => {
+							if (e.key === "Escape") {
+								onOpenChange(false);
+							}
+						}}
+						tabIndex={-1}
+						role="button"
+						aria-label="Close dialog"
 					/>
 					{children}
 				</div>
@@ -47,9 +55,12 @@ const DialogTrigger = React.forwardRef<
 	const { onOpenChange } = context;
 
 	if (asChild) {
-		return React.cloneElement(children as React.ReactElement, {
-			onClick: () => onOpenChange(true),
-		});
+		return React.cloneElement(
+			children as React.ReactElement<{ onClick?: () => void }>,
+			{
+				onClick: () => onOpenChange(true),
+			},
+		);
 	}
 
 	return (
@@ -87,6 +98,7 @@ const DialogContent = React.forwardRef<
 		>
 			{children}
 			<button
+				type="button"
 				className="absolute top-4 right-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
 				onClick={() => onOpenChange(false)}
 			>

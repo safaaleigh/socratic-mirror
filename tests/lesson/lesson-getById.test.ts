@@ -11,7 +11,7 @@ describe("lesson.getById tRPC procedure", () => {
 	let testUser: Awaited<ReturnType<typeof createTestUser>>;
 	let otherUser: Awaited<ReturnType<typeof createTestUser>>;
 	let testSession: Session;
-	let testLesson: any;
+	let testLesson: { id: string };
 
 	beforeEach(async () => {
 		await cleanupDatabase();

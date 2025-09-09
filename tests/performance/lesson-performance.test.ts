@@ -140,7 +140,8 @@ describe("Lesson Performance Tests", () => {
 		});
 
 		test("lesson.getById should complete in <2s", async () => {
-			const testLessonId = testLessonIds[0]!;
+			const testLessonId = testLessonIds[0];
+			if (!testLessonId) throw new Error("Test lesson not found");
 			const startTime = performance.now();
 
 			const lesson = await caller.lesson.getById({ id: testLessonId });
@@ -158,7 +159,8 @@ describe("Lesson Performance Tests", () => {
 
 	describe("UPDATE Performance", () => {
 		test("lesson.update should complete in <2s", async () => {
-			const testLessonId = testLessonIds[1]!;
+			const testLessonId = testLessonIds[1];
+			if (!testLessonId) throw new Error("Test lesson not found");
 			const startTime = performance.now();
 
 			const updatedLesson = await caller.lesson.update({
@@ -180,7 +182,8 @@ describe("Lesson Performance Tests", () => {
 
 	describe("LIFECYCLE Performance", () => {
 		test("lesson.publish should complete in <2s", async () => {
-			const testLessonId = testLessonIds[2]!;
+			const testLessonId = testLessonIds[2];
+			if (!testLessonId) throw new Error("Test lesson not found");
 			const startTime = performance.now();
 
 			const publishedLesson = await caller.lesson.publish({ id: testLessonId });
@@ -196,7 +199,8 @@ describe("Lesson Performance Tests", () => {
 		});
 
 		test("lesson.archive should complete in <2s", async () => {
-			const testLessonId = testLessonIds[2]!; // Use the published lesson
+			const testLessonId = testLessonIds[2]; // Use the published lesson
+			if (!testLessonId) throw new Error("Test lesson not found");
 			const startTime = performance.now();
 
 			const archivedLesson = await caller.lesson.archive({ id: testLessonId });
@@ -212,7 +216,8 @@ describe("Lesson Performance Tests", () => {
 		});
 
 		test("lesson.fork should complete in <2s", async () => {
-			const testLessonId = testLessonIds[2]!; // Use the archived lesson
+			const testLessonId = testLessonIds[2]; // Use the archived lesson
+			if (!testLessonId) throw new Error("Test lesson not found");
 			const startTime = performance.now();
 
 			const forkedLesson = await caller.lesson.fork({
@@ -297,9 +302,9 @@ describe("Lesson Performance Tests", () => {
 
 			// Check that all concurrent requests completed successfully
 			expect(results).toHaveLength(5);
-			results.forEach((result) => {
+			for (const result of results) {
 				expect(result.duration).toBeLessThan(2000);
-			});
+			}
 		});
 
 		test("lesson.list performance with different scenarios", async () => {
@@ -361,15 +366,22 @@ describe("Lesson Performance Tests", () => {
 				},
 				{
 					name: "GET_BY_ID",
-					test: () => caller.lesson.getById({ id: testLessonIds[0]! }),
+					test: () => {
+						const id = testLessonIds[0];
+						if (!id) throw new Error("Test lesson ID not found");
+						return caller.lesson.getById({ id });
+					},
 				},
 				{
 					name: "UPDATE",
-					test: () =>
-						caller.lesson.update({
-							id: testLessonIds[3]!,
+					test: () => {
+						const id = testLessonIds[3];
+						if (!id) throw new Error("Test lesson ID not found");
+						return caller.lesson.update({
+							id,
 							title: "Performance Report Update",
-						}),
+						});
+					},
 				},
 			];
 

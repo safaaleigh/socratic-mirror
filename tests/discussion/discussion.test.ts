@@ -59,9 +59,7 @@ describe("Discussion Router Contract Tests", () => {
 				maxParticipants: -1,
 			};
 
-			await expect(
-				caller.discussion.create(invalidInput as any),
-			).rejects.toThrow();
+			await expect(caller.discussion.create(invalidInput)).rejects.toThrow();
 		});
 	});
 
@@ -326,7 +324,7 @@ describe("Discussion Router Contract Tests", () => {
 	describe("leave", () => {
 		let testDiscussion: any;
 		let participantUser: Awaited<ReturnType<typeof createTestUser>>;
-		let participantCaller: any;
+		let participantCaller: Awaited<ReturnType<typeof createTestCaller>>;
 
 		beforeEach(async () => {
 			// Create discussion via tRPC to ensure proper setup

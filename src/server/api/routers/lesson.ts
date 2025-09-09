@@ -49,7 +49,10 @@ const forkLessonSchema = z.object({
 });
 
 // Helper function to compute lesson status and permissions
-function computeLessonMetadata(lesson: any, currentUserId: string) {
+function computeLessonMetadata(
+	lesson: any,
+	currentUserId: string,
+) {
 	const isOwner = lesson.creatorId === currentUserId;
 
 	let status: "draft" | "published" | "archived";

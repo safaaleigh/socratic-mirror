@@ -8,12 +8,23 @@ import {
 	createTestUser,
 } from "../db-setup";
 
+// Type for test discussion data
+type TestDiscussion = {
+	id: string;
+	name: string;
+	description?: string;
+	isActive: boolean;
+	maxParticipants: number;
+	lessonId: string;
+	createdById: string;
+};
+
 describe("Message Router Contract Tests", () => {
 	let testUser: Awaited<ReturnType<typeof createTestUser>>;
 	let testSession: Session;
 	let caller: Awaited<ReturnType<typeof createTestCaller>>;
 	let testLesson: Lesson;
-	let testDiscussion: any;
+	let testDiscussion: TestDiscussion;
 
 	beforeEach(async () => {
 		await cleanupDatabase();
@@ -26,13 +37,14 @@ describe("Message Router Contract Tests", () => {
 		testLesson = await createTestLesson(testUser.id);
 
 		// Create a discussion to use in tests
-		testDiscussion = await caller.discussion.create({
+		const createdDiscussion = await caller.discussion.create({
 			lessonId: testLesson.id,
 			name: "Test Discussion",
 			description: "Test discussion for messages",
 			maxParticipants: 10,
 			isPublic: false,
 		});
+		testDiscussion = { ...createdDiscussion, createdById: testUser.id };
 	});
 
 	afterEach(async () => {
@@ -91,7 +103,7 @@ describe("Message Router Contract Tests", () => {
 				content: "", // Empty content should fail
 			};
 
-			await expect(caller.message.send(invalidInput as any)).rejects.toThrow();
+				await expect(caller.message.send(invalidInput)).rejects.toThrow();
 		});
 
 		it("should reject messages to non-existent discussion", async () => {
@@ -100,7 +112,7 @@ describe("Message Router Contract Tests", () => {
 				content: "This should fail",
 			};
 
-			await expect(caller.message.send(input as any)).rejects.toThrow();
+				await expect(caller.message.send(input)).rejects.toThrow();
 		});
 	});
 
@@ -171,7 +183,7 @@ describe("Message Router Contract Tests", () => {
 	});
 
 	describe("edit", () => {
-		let testMessage: any;
+		let testMessage: { id: string; content: string; discussionId: string };
 
 		beforeEach(async () => {
 			// Create a message to edit
@@ -231,7 +243,7 @@ describe("Message Router Contract Tests", () => {
 	});
 
 	describe("delete", () => {
-		let testMessage: any;
+		let testMessage: { id: string; content: string; discussionId: string };
 
 		beforeEach(async () => {
 			// Create a message to delete

@@ -430,12 +430,11 @@ export class EmailService {
 					success: true,
 					messageId: emailResult.invitationId,
 				};
-			} else {
-				return {
-					success: false,
-					error: emailResult?.error || "Failed to send email",
-				};
 			}
+			return {
+				success: false,
+				error: emailResult?.error || "Failed to send email",
+			};
 		} catch (error) {
 			return {
 				success: false,

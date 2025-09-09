@@ -11,9 +11,9 @@ describe("lesson lifecycle procedures", () => {
 	let testUser: Awaited<ReturnType<typeof createTestUser>>;
 	let otherUser: Awaited<ReturnType<typeof createTestUser>>;
 	let testSession: Session;
-	let draftLesson: any;
-	let publishedLesson: any;
-	let archivedLesson: any;
+	let draftLesson: { id: string };
+	let publishedLesson: { id: string };
+	let archivedLesson: { id: string };
 
 	beforeEach(async () => {
 		await cleanupDatabase();

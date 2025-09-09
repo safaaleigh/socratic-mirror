@@ -1,9 +1,38 @@
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { aiService } from "@/server/services/ai-facilitator";
 import { getWebSocketService } from "@/server/services/websocket";
-import type { MessageType } from "@prisma/client";
+import type { MessageType, PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+
+// Types for better type safety
+type MessageData = {
+	id: string;
+	discussionId: string;
+	authorId: string | null;
+	author?: {
+		id: string;
+		name: string | null;
+		email: string;
+		image: string | null;
+	} | null;
+	content: string;
+	type: MessageType;
+	parentId: string | null;
+	parent?: {
+		id: string;
+		content: string;
+		author?: {
+			name: string | null;
+		} | null;
+	} | null;
+	isEdited?: boolean;
+	editedAt: Date | null;
+	createdAt: Date;
+	_count?: {
+		replies: number;
+	};
+};
 
 // Contract-compliant validation schemas
 const sendMessageSchema = z.object({
@@ -42,7 +71,7 @@ const getAIResponseSchema = z.object({
 });
 
 // Helper functions
-function formatMessageOutput(message: any) {
+function formatMessageOutput(message: MessageData) {
 	return {
 		id: message.id,
 		discussionId: message.discussionId,
@@ -62,12 +91,12 @@ function formatMessageOutput(message: any) {
 		editedAt: message.editedAt,
 		createdAt: message.createdAt,
 		replyCount: message._count?.replies || 0,
-		reactions: message.reactions || {},
+		// reactions field removed from schema
 	};
 }
 
 async function checkParticipantPermission(
-	db: any,
+	db: PrismaClient,
 	userId: string,
 	discussionId: string,
 ) {
@@ -384,11 +413,11 @@ export const messageRouter = createTRPCRouter({
 				data: { lastSeenAt: new Date() },
 			});
 
-			const where: any = {
+			const where = {
 				discussionId: input.discussionId,
 				...(input.parentId !== undefined && { parentId: input.parentId }),
 				...(input.cursor && { id: { lt: input.cursor } }),
-			};
+			} as const;
 
 			const messages = await ctx.db.message.findMany({
 				where,
@@ -476,7 +505,7 @@ export const messageRouter = createTRPCRouter({
 			// Get the message
 			const message = await ctx.db.message.findUnique({
 				where: { id: input.messageId },
-				select: { discussionId: true, reactions: true },
+				select: { discussionId: true },
 			});
 
 			if (!message) {
@@ -493,29 +522,11 @@ export const messageRouter = createTRPCRouter({
 				message.discussionId,
 			);
 
-			// Update reactions
-			const reactions = (message.reactions as Record<string, number>) || {};
-			const currentCount = reactions[input.reaction] || 0;
-
-			// Toggle reaction (add if not present, remove if present)
-			if (currentCount > 0) {
-				// For simplicity, just decrement (in real app, track individual user reactions)
-				reactions[input.reaction] = Math.max(0, currentCount - 1);
-			} else {
-				reactions[input.reaction] = currentCount + 1;
-			}
-
-			// Remove empty reactions
-			if (reactions[input.reaction] === 0) {
-				delete reactions[input.reaction];
-			}
-
-			await ctx.db.message.update({
-				where: { id: input.messageId },
-				data: { reactions },
+			// TODO: Implement reactions feature when reactions field is added to schema
+			throw new TRPCError({
+				code: "NOT_IMPLEMENTED",
+				message: "Reactions feature not yet implemented",
 			});
-
-			return { reactions };
 		}),
 
 	// Update typing indicator

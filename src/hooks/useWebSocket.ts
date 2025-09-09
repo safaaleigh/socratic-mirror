@@ -3,11 +3,18 @@
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+// WebSocket data types
+type WebSocketData =
+	| { user: ConnectedUser } // for user_joined
+	| { userId: string } // for user_left
+	| { messageId?: string; content?: string } // for messages
+	| Record<string, unknown>; // fallback for other data
+
 export interface WebSocketMessage {
 	type: "message" | "typing" | "join" | "leave" | "error" | "ping" | "pong";
 	discussionId?: string;
 	userId?: string;
-	data?: any;
+	data?: WebSocketData;
 	timestamp: number;
 }
 
@@ -22,7 +29,7 @@ export interface MessageEvent {
 		| "ai_thinking";
 	discussionId: string;
 	userId?: string;
-	data: any;
+	data: WebSocketData;
 	timestamp: number;
 }
 
@@ -80,7 +87,7 @@ export function useWebSocket({
 		try {
 			const wsUrl = new URL("/ws", window.location.origin);
 			wsUrl.protocol = wsUrl.protocol === "https:" ? "wss:" : "ws:";
-			wsUrl.searchParams.set("token", session.accessToken || "mock-token"); // In production, get actual JWT
+			wsUrl.searchParams.set("token", session.user.id); // Use user ID as token for now
 			wsUrl.searchParams.set("discussionId", discussionId);
 			wsUrl.searchParams.set("userId", session.user.id);
 			wsUrl.searchParams.set("userName", session.user.name || "Anonymous");
@@ -114,7 +121,7 @@ export function useWebSocket({
 
 				// Attempt to reconnect unless it was a clean close
 				if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
-					const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+					const delay = Math.min(1000 * 2 ** reconnectAttempts, 30000);
 					console.log(
 						`🔄 Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1})`,
 					);
@@ -138,9 +145,9 @@ export function useWebSocket({
 
 	// Handle incoming messages
 	const handleMessage = useCallback(
-		(message: any) => {
+		(message: { type?: string; data?: unknown }) => {
 			if (message.type === "message" && message.data) {
-				const event: MessageEvent = message.data;
+				const event = message.data as MessageEvent;
 
 				switch (event.type) {
 					case "new_message":
@@ -156,32 +163,36 @@ export function useWebSocket({
 						break;
 
 					case "user_joined":
-						if (event.data?.user) {
-							onUserJoined?.(event.data.user);
+						if (event.data && 'user' in event.data && event.data.user) {
+							const user = event.data.user as ConnectedUser;
+							onUserJoined?.(user);
 							setConnectedUsers((prev) => {
-								const exists = prev.some((u) => u.id === event.data.user.id);
-								return exists ? prev : [...prev, event.data.user];
+								const exists = prev.some((u) => u.id === user.id);
+								return exists ? prev : [...prev, user];
 							});
 						}
 						break;
 
 					case "user_left":
-						if (event.data?.userId) {
-							onUserLeft?.(event.data.userId);
+						if (event.data && 'userId' in event.data && event.data.userId) {
+							const userId = event.data.userId as string;
+							onUserLeft?.(userId);
 							setConnectedUsers((prev) =>
-								prev.filter((u) => u.id !== event.data.userId),
+								prev.filter((u) => u.id !== userId),
 							);
 						}
 						break;
 
-					case "typing":
-						const users = event.data?.users || [];
+					case "typing": {
+						const users = (event.data && 'users' in event.data ? event.data.users : []) as TypingUser[];
 						setTypingUsers(users);
 						onTypingUpdate?.(users);
 						break;
+					}
 
 					case "ai_thinking":
-						onAIThinking?.(event.data?.isThinking === true);
+						const isThinking = event.data && 'isThinking' in event.data ? event.data.isThinking === true : false;
+						onAIThinking?.(isThinking);
 						break;
 				}
 			} else if (message.type === "pong") {
@@ -286,7 +297,7 @@ export function useWebSocket({
 				wsRef.current.close(1000, "Component unmounting");
 			}
 		};
-	}, [connect]);
+	}, [connect, stopHeartbeat]);
 
 	return {
 		isConnected,

@@ -1,6 +1,6 @@
-import type { IncomingMessage } from "http";
-import type { Server } from "http";
-import { parse } from "url";
+import type { IncomingMessage } from "node:http";
+import type { Server } from "node:http";
+import { parse } from "node:url";
 import { env } from "@/env";
 import { verify } from "jsonwebtoken";
 import { WebSocket, WebSocketServer } from "ws";
@@ -9,7 +9,7 @@ export interface WebSocketMessage {
 	type: "message" | "typing" | "join" | "leave" | "error" | "ping" | "pong";
 	discussionId?: string;
 	userId?: string;
-	data?: any;
+	data?: Record<string, unknown>;
 	timestamp: number;
 }
 
@@ -24,7 +24,7 @@ export interface MessageEvent {
 		| "ai_thinking";
 	discussionId: string;
 	userId?: string;
-	data: any;
+	data: Record<string, unknown>;
 	timestamp: number;
 }
 
@@ -96,7 +96,7 @@ export class WebSocketService {
 
 			// Verify JWT token (basic auth check)
 			// In production, you'd verify against your auth system
-			const decoded = verify(token, env.AUTH_SECRET);
+			const decoded = verify(token, env.AUTH_SECRET || "");
 
 			if (!decoded) {
 				console.warn("WebSocket connection rejected: Invalid token");
@@ -144,10 +144,10 @@ export class WebSocketService {
 		if (!this.discussionUsers.has(discussionId)) {
 			this.discussionUsers.set(discussionId, new Set());
 		}
-		this.discussionUsers.get(discussionId)!.add(wsId);
+		this.discussionUsers.get(discussionId)?.add(wsId);
 
 		// Set up event handlers
-		ws.on("message", (data) => this.handleMessage(wsId, data));
+		ws.on("message", (data) => this.handleMessage(wsId, data.toString()));
 		ws.on("close", () => this.handleDisconnect(wsId));
 		ws.on("error", (error) => this.handleError(wsId, error));
 		ws.on("pong", () => this.handlePong(wsId));
@@ -235,7 +235,8 @@ export class WebSocketService {
 			this.typingUsers.set(discussionId, new Map());
 		}
 
-		const discussionTyping = this.typingUsers.get(discussionId)!;
+		const discussionTyping = this.typingUsers.get(discussionId);
+		if (!discussionTyping) return;
 
 		if (isTyping) {
 			discussionTyping.set(user.userId, {
@@ -281,7 +282,7 @@ export class WebSocketService {
 			type: "new_message",
 			discussionId: message.discussionId,
 			userId: user.userId,
-			data: message.data,
+			data: message.data || {},
 			timestamp: Date.now(),
 		});
 	}
@@ -300,7 +301,7 @@ export class WebSocketService {
 		if (!this.discussionUsers.has(message.discussionId)) {
 			this.discussionUsers.set(message.discussionId, new Set());
 		}
-		this.discussionUsers.get(message.discussionId)!.add(wsId);
+		this.discussionUsers.get(message.discussionId)?.add(wsId);
 
 		// Notify others
 		this.broadcastToDiscussion(
@@ -499,7 +500,7 @@ export class WebSocketService {
 	/**
 	 * Send message to specific WebSocket client
 	 */
-	private sendToClient(ws: WebSocket, message: any): void {
+	private sendToClient(ws: WebSocket, message: Record<string, unknown>): void {
 		if (ws.readyState === WebSocket.OPEN) {
 			ws.send(JSON.stringify(message));
 		}

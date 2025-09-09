@@ -61,7 +61,11 @@ function generateJoinCode(): string {
 	return code;
 }
 
-function formatDiscussionOutput(discussion: any, userRole?: ParticipantRole) {
+function formatDiscussionOutput(
+	discussion: any,
+	userRole?: ParticipantRole,
+	currentUserId?: string,
+) {
 	return {
 		id: discussion.id,
 		name: discussion.name,
@@ -82,6 +86,7 @@ function formatDiscussionOutput(discussion: any, userRole?: ParticipantRole) {
 		updatedAt: discussion.updatedAt,
 		closedAt: discussion.closedAt,
 		userRole: userRole || null,
+		isCreator: discussion.creatorId === currentUserId,
 	};
 }
 
@@ -187,7 +192,7 @@ export const discussionRouter = createTRPCRouter({
 				},
 			});
 
-			return formatDiscussionOutput(discussion, "CREATOR");
+			return formatDiscussionOutput(discussion, "CREATOR", ctx.session.user.id);
 		}),
 
 	// Update discussion details (creator only)
@@ -249,7 +254,7 @@ export const discussionRouter = createTRPCRouter({
 				},
 			});
 
-			return formatDiscussionOutput(discussion, "CREATOR");
+			return formatDiscussionOutput(discussion, "CREATOR", ctx.session.user.id);
 		}),
 
 	// Close a discussion (creator only)
@@ -328,7 +333,7 @@ export const discussionRouter = createTRPCRouter({
 				});
 			}
 
-			return formatDiscussionOutput(discussion, "CREATOR");
+			return formatDiscussionOutput(discussion, "CREATOR", ctx.session.user.id);
 		}),
 
 	// Get discussion details
@@ -389,7 +394,7 @@ export const discussionRouter = createTRPCRouter({
 				});
 			}
 
-			return formatDiscussionOutput(discussion, participant.role);
+			return formatDiscussionOutput(discussion, participant.role, ctx.session.user.id);
 		}),
 
 	// List discussions (filtered by role)
@@ -473,7 +478,7 @@ export const discussionRouter = createTRPCRouter({
 			}
 
 			const formattedDiscussions = discussions.map((d) =>
-				formatDiscussionOutput(d, d.participants[0]?.role),
+				formatDiscussionOutput(d, d.participants[0]?.role, ctx.session.user.id),
 			);
 
 			return {
@@ -628,6 +633,7 @@ export const discussionRouter = createTRPCRouter({
 						discussion: formatDiscussionOutput(
 							discussion,
 							existingParticipant.role,
+							ctx.session.user.id,
 						),
 						participant: formatParticipantOutput(updatedParticipant),
 					};
@@ -637,6 +643,7 @@ export const discussionRouter = createTRPCRouter({
 					discussion: formatDiscussionOutput(
 						discussion,
 						existingParticipant.role,
+						ctx.session.user.id,
 					),
 					participant: formatParticipantOutput(existingParticipant),
 				};
@@ -693,7 +700,7 @@ export const discussionRouter = createTRPCRouter({
 			}
 
 			return {
-				discussion: formatDiscussionOutput(discussion, "PARTICIPANT"),
+				discussion: formatDiscussionOutput(discussion, "PARTICIPANT", ctx.session.user.id),
 				participant: formatParticipantOutput(participant),
 			};
 		}),

@@ -85,8 +85,8 @@ describe("Invitation Router Contract Tests", () => {
 				],
 			};
 
-			await expect(
-				caller.invitation.sendInvitations(invalidInput as any),
+				await expect(
+				caller.invitation.sendInvitations(invalidInput),
 			).rejects.toThrow();
 		});
 
@@ -321,7 +321,7 @@ describe("Invitation Router Contract Tests", () => {
 	describe("accept", () => {
 		let invitationToken: string;
 		let acceptUser: Awaited<ReturnType<typeof createTestUser>>;
-		let acceptCaller: any;
+		let acceptCaller: Awaited<ReturnType<typeof createTestCaller>>;
 
 		beforeEach(async () => {
 			// Create a user who will accept the invitation

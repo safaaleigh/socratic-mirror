@@ -65,10 +65,6 @@ const DEFAULT_AI_CONFIG: AIConfig = {
 };
 
 export class AIFacilitatorService {
-	constructor() {
-		// AI service is now handled by the unified provider
-	}
-
 	/**
 	 * Generate AI-facilitated response for a discussion
 	 */
@@ -98,7 +94,7 @@ export class AIFacilitatorService {
 			}
 
 			if (content.length > 1000) {
-				content = content.substring(0, 997) + "...";
+				content = `${content.substring(0, 997)}...`;
 			}
 
 			// Ensure valid type
@@ -288,9 +284,9 @@ TONE: Encouraging, curious, intellectually rigorous but supportive.
 			discussionContext.recentMessages.length > 0
 		) {
 			prompt += "RECENT DISCUSSION:\n";
-			discussionContext.recentMessages.slice(-3).forEach((msg) => {
+			for (const msg of discussionContext.recentMessages.slice(-3)) {
 				prompt += `${msg.authorName || "Anonymous"}: "${msg.content}"\n`;
-			});
+			}
 			prompt += "\n";
 		}
 
@@ -389,7 +385,7 @@ TONE: Encouraging, curious, intellectually rigorous but supportive.
 			},
 		};
 
-		const fallback = fallbacks[goal] || fallbacks["ENCOURAGE_PARTICIPATION"];
+		const fallback = fallbacks[goal] || fallbacks.ENCOURAGE_PARTICIPATION;
 
 		return {
 			...fallback,

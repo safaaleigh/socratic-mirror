@@ -6,8 +6,8 @@ const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 const TEST_TIMEOUT = 60000;
 
 test.describe("Discussion Lifecycle E2E Tests", () => {
-	let testUser: any;
-	let testLesson: any;
+	let testUser: { id: string; email: string };
+	let testLesson: { id: string };
 
 	test.beforeEach(async () => {
 		// Clean database and create test data
@@ -287,7 +287,10 @@ test.describe("Discussion Lifecycle E2E Tests", () => {
 				).toContainText("questioning assumptions");
 
 				// Test message reactions
-				await creatorPage.hover('[data-testid="message-item"]').last();
+				await creatorPage
+					.locator('[data-testid="message-item"]')
+					.last()
+					.hover();
 				await creatorPage.click('[data-testid="react-thumbs-up"]');
 
 				// Verify reaction appears
@@ -503,7 +506,7 @@ test.describe("Discussion Lifecycle E2E Tests", () => {
 		test.setTimeout(30000);
 
 		// Set mobile viewport
-		await context.setViewportSize({ width: 375, height: 667 });
+		await page.setViewportSize({ width: 375, height: 667 });
 
 		await test.step("Mobile discussion interface", async () => {
 			await page.goto(`${BASE_URL}/discussions`);

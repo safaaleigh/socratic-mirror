@@ -166,7 +166,7 @@ export const dashboardRouter = createTRPCRouter({
 			// Pending invitations received
 			ctx.db.invitation.count({
 				where: {
-					recipientEmail: ctx.session.user.email!,
+					recipientEmail: ctx.session.user.email ?? "",
 					status: "PENDING",
 					expiresAt: { gt: new Date() },
 				},
@@ -501,20 +501,20 @@ export const dashboardRouter = createTRPCRouter({
 			}
 
 			// Aggregate message counts
-			messagesPerDay.forEach((item) => {
+			for (const item of messagesPerDay) {
 				const dateKey = item.createdAt.toISOString().split("T")[0];
 				if (dateKey && dailyMetrics[dateKey]) {
 					dailyMetrics[dateKey].messages = item._count;
 				}
-			});
+			}
 
 			// Aggregate active user counts
-			activeUsersPerDay.forEach((item) => {
+			for (const item of activeUsersPerDay) {
 				const dateKey = item.lastSeenAt.toISOString().split("T")[0];
 				if (dateKey && dailyMetrics[dateKey]) {
 					dailyMetrics[dateKey].activeUsers = item._count;
 				}
-			});
+			}
 
 			return {
 				period: {

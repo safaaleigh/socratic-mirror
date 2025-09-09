@@ -17,6 +17,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { type MessageEvent, useWebSocket } from "@/hooks/useWebSocket";
 import { api } from "@/trpc/react";
+import { type MessageType } from "@prisma/client";
 import {
 	AlertCircle,
 	Bot,
@@ -31,6 +32,34 @@ import {
 	WifiOff,
 } from "lucide-react";
 
+// Define proper types for messages
+type MessageData = {
+	id: string;
+	discussionId: string;
+	authorId: string | null;
+	author: {
+		id: string;
+		name: string | null;
+		email: string;
+		image: string | null;
+	} | null | undefined;
+	content: string;
+	type: MessageType;
+	parentId: string | null;
+	parent: {
+		id: string;
+		content: string;
+		authorName: string | null;
+	} | null;
+	isEdited: boolean;
+	editedAt: Date | null;
+	createdAt: Date;
+	replyCount: number;
+	reactions?: Record<string, number>;
+	canEdit?: boolean;
+	aiSuggestions?: string[];
+};
+
 interface MessageListProps {
 	discussionId: string;
 	onReplyToMessage?: (messageId: string, content: string) => void;
@@ -44,7 +73,7 @@ export function MessageList({
 }: MessageListProps) {
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const [replyingTo, setReplyingTo] = useState<string | null>(null);
-	const [realTimeMessages, setRealTimeMessages] = useState<any[]>([]);
+	const [realTimeMessages, setRealTimeMessages] = useState<MessageData[]>([]);
 
 	const {
 		data: messages,
@@ -102,7 +131,7 @@ export function MessageList({
 	// Auto-scroll to bottom when new messages arrive
 	useEffect(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, [messages?.messages.length]);
+	});
 
 	const handleReaction = (
 		messageId: string,
@@ -123,15 +152,41 @@ export function MessageList({
 	if (isLoading) {
 		return (
 			<div className="space-y-4">
-				{[...Array(5)].map((_, i) => (
-					<div key={i} className="flex gap-3">
-						<Skeleton className="h-8 w-8 rounded-full" />
-						<div className="flex-1 space-y-2">
-							<Skeleton className="h-4 w-1/4" />
-							<Skeleton className="h-16 w-full" />
-						</div>
+				<div key="message-skeleton-1" className="flex gap-3">
+					<Skeleton className="h-8 w-8 rounded-full" />
+					<div className="flex-1 space-y-2">
+						<Skeleton className="h-4 w-1/4" />
+						<Skeleton className="h-16 w-full" />
 					</div>
-				))}
+				</div>
+				<div key="message-skeleton-2" className="flex gap-3">
+					<Skeleton className="h-8 w-8 rounded-full" />
+					<div className="flex-1 space-y-2">
+						<Skeleton className="h-4 w-1/4" />
+						<Skeleton className="h-16 w-full" />
+					</div>
+				</div>
+				<div key="message-skeleton-3" className="flex gap-3">
+					<Skeleton className="h-8 w-8 rounded-full" />
+					<div className="flex-1 space-y-2">
+						<Skeleton className="h-4 w-1/4" />
+						<Skeleton className="h-16 w-full" />
+					</div>
+				</div>
+				<div key="message-skeleton-4" className="flex gap-3">
+					<Skeleton className="h-8 w-8 rounded-full" />
+					<div className="flex-1 space-y-2">
+						<Skeleton className="h-4 w-1/4" />
+						<Skeleton className="h-16 w-full" />
+					</div>
+				</div>
+				<div key="message-skeleton-5" className="flex gap-3">
+					<Skeleton className="h-8 w-8 rounded-full" />
+					<div className="flex-1 space-y-2">
+						<Skeleton className="h-4 w-1/4" />
+						<Skeleton className="h-16 w-full" />
+					</div>
+				</div>
 			</div>
 		);
 	}
@@ -219,7 +274,7 @@ export function MessageList({
 					<div className="flex items-center">
 						<span className="text-muted-foreground text-sm">
 							{typingUsers.length === 1
-								? `${typingUsers[0].name} is typing...`
+								? `${typingUsers[0]?.name} is typing...`
 								: `${typingUsers.length} people are typing...`}
 						</span>
 					</div>
@@ -232,8 +287,11 @@ export function MessageList({
 }
 
 interface MessageItemProps {
-	message: any;
-	onReact: (messageId: string, emoji: string) => void;
+	message: MessageData;
+	onReact: (
+		messageId: string,
+		emoji: "👍" | "👎" | "❤️" | "🤔" | "💡" | "🎯",
+	) => void;
 	onReply: () => void;
 	onEdit: () => void;
 	onDelete: () => void;
@@ -264,7 +322,10 @@ function MessageItem({
 					</div>
 				) : (
 					<>
-						<AvatarImage src={message.author?.image} />
+						<AvatarImage
+							src={message.author?.image || ""}
+							alt={message.author?.name || "User avatar"}
+						/>
 						<AvatarFallback>
 							{message.author?.name?.charAt(0)?.toUpperCase() || "U"}
 						</AvatarFallback>
@@ -308,7 +369,7 @@ function MessageItem({
 									{message.aiSuggestions.map(
 										(suggestion: string, index: number) => (
 											<Button
-												key={index}
+												key={`suggestion-${suggestion.slice(0, 10)}-${index}`}
 												variant="outline"
 												size="sm"
 												className="h-7 text-xs"

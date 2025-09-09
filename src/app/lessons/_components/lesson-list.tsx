@@ -23,6 +23,23 @@ import {
 	Trash2,
 } from "lucide-react";
 
+// Type for lesson data
+type LessonData = {
+	id: string;
+	title: string;
+	description?: string | null;
+	status: "draft" | "published" | "archived";
+	createdAt: Date;
+	updatedAt: Date;
+	facilitationStyle?: string | null;
+	suggestedDuration?: number | null;
+	objectives?: string[];
+	canPublish: boolean;
+	canArchive: boolean;
+	canDelete: boolean;
+	canEdit: boolean;
+};
+
 export function LessonList({
 	onEditLesson,
 }: { onEditLesson?: (lessonId: string) => void }) {
@@ -33,13 +50,21 @@ export function LessonList({
 			<Card>
 				<CardContent className="p-6">
 					<div className="space-y-4">
-						{[...Array(3)].map((_, i) => (
-							<div key={i} className="space-y-2">
-								<Skeleton className="h-4 w-3/4" />
-								<Skeleton className="h-3 w-1/2" />
-								<Skeleton className="h-3 w-1/4" />
-							</div>
-						))}
+						<div key="lesson-skeleton-1" className="space-y-2">
+							<Skeleton className="h-4 w-3/4" />
+							<Skeleton className="h-3 w-1/2" />
+							<Skeleton className="h-3 w-1/4" />
+						</div>
+						<div key="lesson-skeleton-2" className="space-y-2">
+							<Skeleton className="h-4 w-3/4" />
+							<Skeleton className="h-3 w-1/2" />
+							<Skeleton className="h-3 w-1/4" />
+						</div>
+						<div key="lesson-skeleton-3" className="space-y-2">
+							<Skeleton className="h-4 w-3/4" />
+							<Skeleton className="h-3 w-1/2" />
+							<Skeleton className="h-3 w-1/4" />
+						</div>
 					</div>
 				</CardContent>
 			</Card>
@@ -119,8 +144,8 @@ export function LessonList({
 										<div className="flex flex-wrap gap-1">
 											{lesson.objectives
 												.slice(0, 3)
-												.map((objective: string, index: number) => (
-													<Badge key={index} variant="secondary">
+												.map((objective: string) => (
+													<Badge key={objective} variant="secondary">
 														{objective}
 													</Badge>
 												))}
@@ -168,7 +193,7 @@ function LessonStatusBadge({
 function LessonActions({
 	lesson,
 	onEdit,
-}: { lesson: any; onEdit?: (lessonId: string) => void }) {
+}: { lesson: LessonData; onEdit?: (lessonId: string) => void }) {
 	const utils = api.useUtils();
 
 	const publishMutation = api.lesson.publish.useMutation({

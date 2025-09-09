@@ -122,10 +122,10 @@ describe("AI Facilitation Flow Integration Test", () => {
 		// Should include suggested follow-ups
 		if (aiResponse.suggestedFollowUps) {
 			expect(aiResponse.suggestedFollowUps.length).toBeGreaterThan(0);
-			aiResponse.suggestedFollowUps.forEach((followUp) => {
+			for (const followUp of aiResponse.suggestedFollowUps) {
 				expect(typeof followUp).toBe("string");
 				expect(followUp.length).toBeGreaterThan(10);
-			});
+			}
 		}
 
 		// Step 6: User responds to AI guidance
@@ -180,10 +180,10 @@ describe("AI Facilitation Flow Integration Test", () => {
 		expect(aiMessages.length).toBeGreaterThan(0);
 
 		// AI messages should be contextually relevant
-		aiMessages.forEach((message) => {
+		for (const message of aiMessages) {
 			expect(message.authorId).toBeNull();
 			expect(message.content.length).toBeGreaterThan(20);
-		});
+		}
 
 		// Step 11: Test AI response to group dynamics
 		const groupDynamicsAI = await caller.message.getAIResponse({

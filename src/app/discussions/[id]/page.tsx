@@ -110,7 +110,7 @@ export default async function DiscussionPage(
 		discussion.isActive &&
 		!isParticipant &&
 		(!discussion.maxParticipants ||
-			participantsList.length < discussion.maxParticipants);
+			(participantsList?.length ?? 0) < discussion.maxParticipants);
 
 	const handleJoin = () => {
 		joinDiscussionMutation.mutate({ discussionId: params.id });

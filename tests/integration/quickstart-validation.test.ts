@@ -395,7 +395,8 @@ describe("Quickstart Validation: All Scenarios", () => {
 					content: "Valid content",
 					objectives: ["Valid objective"],
 					keyQuestions: ["Valid question?"],
-					facilitationStyle: "invalid" as any,
+					// @ts-expect-error - Testing invalid enum value
+					facilitationStyle: "invalid",
 					suggestedDuration: 30,
 					suggestedGroupSize: 3,
 				}),

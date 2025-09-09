@@ -43,7 +43,7 @@ export function InviteParticipantsModal({
 	const sendInvitationsMutation = api.invitation.sendInvitations.useMutation({
 		onSuccess: (result) => {
 			setError(null);
-			setSuccess(`Invitations sent to ${result.sentCount} recipients`);
+			setSuccess(`Invitations sent to ${result.totalSent} recipients`);
 			setEmailList([]);
 			setCustomMessage("");
 		},
@@ -55,7 +55,7 @@ export function InviteParticipantsModal({
 	const createLinkMutation = api.invitation.createLink.useMutation({
 		onSuccess: (result) => {
 			setError(null);
-			setInviteLink(result.inviteUrl);
+			setInviteLink(result.url);
 			setSuccess("Invitation link created successfully");
 		},
 		onError: (error) => {
@@ -101,8 +101,10 @@ export function InviteParticipantsModal({
 
 		sendInvitationsMutation.mutate({
 			discussionId,
-			emails: emailList,
-			customMessage: customMessage.trim() || undefined,
+			invitations: emailList.map((email) => ({
+				email,
+				personalMessage: customMessage.trim() || undefined,
+			})),
 		});
 	};
 
@@ -110,7 +112,7 @@ export function InviteParticipantsModal({
 		createLinkMutation.mutate({
 			discussionId,
 			maxUses: undefined, // Allow unlimited uses for now
-			expiresAt: undefined, // No expiration for now
+			expiresInDays: 7, // Default 7 days
 		});
 	};
 

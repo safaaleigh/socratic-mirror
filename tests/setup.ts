@@ -3,7 +3,14 @@ import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, vi } from "vitest";
 
 // Set up test environment variables before anything else
-(process.env as any).NODE_ENV = "test";
+if (!process.env.NODE_ENV) {
+	Object.defineProperty(process.env, "NODE_ENV", {
+		value: "test",
+		writable: false,
+		enumerable: true,
+		configurable: false,
+	});
+}
 process.env.DATABASE_URL =
 	"postgresql://test:test@localhost:5432/socratic_test";
 process.env.TEST_DATABASE_URL =

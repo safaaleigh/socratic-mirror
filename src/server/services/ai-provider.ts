@@ -83,7 +83,6 @@ export class UnifiedAIService {
 					model: anthropic(modelName),
 					type: "anthropic" as const,
 				};
-			case "openai":
 			default:
 				if (!env.OPENAI_API_KEY) {
 					throw new Error(
@@ -175,7 +174,7 @@ Important: Respond with ONLY the JSON object, no explanatory text.`;
 				throw new Error("No JSON object found in response");
 			}
 
-			let parsedObject: any;
+			let parsedObject: Record<string, unknown>;
 			try {
 				parsedObject = JSON.parse(jsonString);
 			} catch (jsonError) {
@@ -209,7 +208,7 @@ Important: Respond with ONLY the JSON object, no explanatory text.`;
 			// Try field-by-field generation for facilitation schema
 			if (params.schema === facilitationResponseSchema) {
 				try {
-					return await this.generateFieldByField(params);
+					return (await this.generateFieldByField(params)) as T;
 				} catch (fieldError) {
 					console.error("Field-by-field generation also failed:", fieldError);
 					return {
@@ -245,32 +244,34 @@ Important: Respond with ONLY the JSON object, no explanatory text.`;
 	}
 
 	private fixCommonJSONIssues(jsonString: string): string {
+		let fixed = jsonString;
+
 		// Fix trailing commas in arrays
-		jsonString = jsonString.replace(/,(\s*[\]\}])/g, "$1");
+		fixed = fixed.replace(/,(\s*[\]\}])/g, "$1");
 
 		// Fix unescaped quotes in strings
-		jsonString = jsonString.replace(
+		fixed = fixed.replace(
 			/"([^"]*)"([^",:}\]]*)"([^"]*)":/g,
 			'"$1\\"$2\\"$3":',
 		);
 
 		// Fix missing quotes around keys
-		jsonString = jsonString.replace(/(\w+):/g, '"$1":');
+		fixed = fixed.replace(/(\w+):/g, '"$1":');
 
 		// Remove extra commas
-		jsonString = jsonString.replace(/,,+/g, ",");
+		fixed = fixed.replace(/,,+/g, ",");
 
 		// Fix empty array elements
-		jsonString = jsonString.replace(/,\s*,/g, ",");
-		jsonString = jsonString.replace(/\[\s*,/g, "[");
-		jsonString = jsonString.replace(/,\s*\]/g, "]");
+		fixed = fixed.replace(/,\s*,/g, ",");
+		fixed = fixed.replace(/\[\s*,/g, "[");
+		fixed = fixed.replace(/,\s*\]/g, "]");
 
-		return jsonString;
+		return fixed;
 	}
 
 	private async generateFieldByField(
 		params: GenerateObjectParams,
-	): Promise<any> {
+	): Promise<Record<string, unknown>> {
 		console.log("Using field-by-field generation for facilitation response");
 
 		const baseContext = `Context: ${params.prompt}`;
@@ -324,9 +325,11 @@ Important: Respond with ONLY the JSON object, no explanatory text.`;
 		return result;
 	}
 
-	private validateAndSanitizeFacilitationResponse(obj: any): any {
+	private validateAndSanitizeFacilitationResponse(
+		obj: Record<string, unknown>,
+	): Record<string, unknown> {
 		// Ensure required fields exist with defaults
-		const sanitized: any = {
+		const sanitized: Record<string, unknown> = {
 			content:
 				obj.content || "Let's continue our discussion. What are your thoughts?",
 			type: obj.type === "AI_PROMPT" ? "AI_PROMPT" : "AI_QUESTION",
@@ -341,7 +344,7 @@ Important: Respond with ONLY the JSON object, no explanatory text.`;
 		if (Array.isArray(obj.suggestedFollowUps)) {
 			sanitized.suggestedFollowUps = obj.suggestedFollowUps
 				.filter(
-					(item: any) => typeof item === "string" && item.trim().length > 0,
+					(item: unknown) => typeof item === "string" && item.trim().length > 0,
 				)
 				.slice(0, 3);
 		}

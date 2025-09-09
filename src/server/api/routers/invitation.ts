@@ -5,9 +5,50 @@ import {
 } from "@/server/api/trpc";
 import { emailService } from "@/server/services/email";
 import { getWebSocketService } from "@/server/services/websocket";
-import type { InvitationStatus, ParticipantRole } from "@prisma/client";
+import type {
+	InvitationStatus,
+	ParticipantRole,
+	PrismaClient,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+
+// Types for better type safety
+type InvitationData = {
+	id: string;
+	type: string;
+	targetId: string;
+	recipientEmail: string;
+	recipientId: string | null;
+	senderId: string;
+	sender?: {
+		id: string;
+		name: string | null;
+		email: string;
+	};
+	message: string | null;
+	token: string;
+	status: InvitationStatus;
+	expiresAt: Date;
+	acceptedAt: Date | null;
+	declinedAt: Date | null;
+	createdAt: Date;
+};
+
+type DiscussionData = {
+	id: string;
+	name: string;
+	description?: string | null;
+	isActive: boolean;
+	maxParticipants: number;
+	lesson?: {
+		title: string;
+		description?: string | null;
+	} | null;
+	_count: {
+		participants: number;
+	};
+};
 
 // Contract-compliant validation schemas
 const sendInvitationsSchema = z.object({
@@ -50,7 +91,7 @@ const listInvitationsSchema = z.object({
 });
 
 // Helper functions
-function formatInvitationOutput(invitation: any) {
+function formatInvitationOutput(invitation: InvitationData) {
 	return {
 		id: invitation.id,
 		type: invitation.type,
@@ -66,15 +107,14 @@ function formatInvitationOutput(invitation: any) {
 		acceptedAt: invitation.acceptedAt,
 		declinedAt: invitation.declinedAt,
 		createdAt: invitation.createdAt,
-		discussion: invitation.discussion,
 	};
 }
 
 async function checkDiscussionPermission(
-	db: any,
+	db: PrismaClient,
 	userId: string,
 	discussionId: string,
-) {
+): Promise<DiscussionData> {
 	// Check if user is creator or moderator of the discussion
 	const participant = await db.discussionParticipant.findFirst({
 		where: {
@@ -132,6 +172,39 @@ async function checkDiscussionPermission(
 	}
 
 	return discussion;
+}
+
+async function getDiscussionForInvitation(
+	db: PrismaClient,
+	invitation: InvitationData,
+): Promise<DiscussionData | null> {
+	if (invitation.type !== "DISCUSSION") {
+		return null;
+	}
+
+	return await db.discussion.findUnique({
+		where: { id: invitation.targetId },
+		select: {
+			id: true,
+			name: true,
+			description: true,
+			isActive: true,
+			maxParticipants: true,
+			lesson: {
+				select: {
+					title: true,
+					description: true,
+				},
+			},
+			_count: {
+				select: {
+					participants: {
+						where: { status: "ACTIVE" },
+					},
+				},
+			},
+		},
+	});
 }
 
 export const invitationRouter = createTRPCRouter({
@@ -235,13 +308,24 @@ export const invitationRouter = createTRPCRouter({
 					// Send email
 					try {
 						await emailService.sendSingleInvitation({
-							invitationId: invitation.id,
-							recipientEmail: inviteData.email,
-							senderName: ctx.session.user.name || "A discussion creator",
-							discussionName: discussion.name,
-							lessonTitle: discussion.lesson?.title,
-							message: inviteData.personalMessage,
-							joinUrl: `${process.env.NEXTAUTH_URL}/invitations/${invitation.token}`,
+							email: inviteData.email,
+							personalMessage: inviteData.personalMessage,
+							discussion: {
+								id: discussion.id,
+								name: discussion.name,
+								description: discussion.description || undefined,
+								lesson: discussion.lesson
+									? {
+											title: discussion.lesson.title,
+											description: discussion.lesson.description || undefined,
+										}
+									: undefined,
+							},
+							sender: {
+								name: ctx.session.user.name || "A discussion creator",
+								email: ctx.session.user.email || "",
+							},
+							invitationToken: invitation.token,
 							expiresAt,
 						});
 
@@ -307,8 +391,6 @@ export const invitationRouter = createTRPCRouter({
 					senderId: ctx.session.user.id,
 					status: "PENDING" as InvitationStatus,
 					expiresAt,
-					maxUses: input.maxUses,
-					isLink: true,
 				},
 			});
 
@@ -318,8 +400,6 @@ export const invitationRouter = createTRPCRouter({
 				url,
 				token: invitation.token,
 				expiresAt,
-				maxUses: input.maxUses || null,
-				currentUses: 0,
 			};
 		}),
 
@@ -335,19 +415,6 @@ export const invitationRouter = createTRPCRouter({
 							id: true,
 							name: true,
 							email: true,
-						},
-					},
-					discussion: {
-						select: {
-							id: true,
-							name: true,
-							description: true,
-							lesson: {
-								select: {
-									title: true,
-									description: true,
-								},
-							},
 						},
 					},
 				},
@@ -375,6 +442,25 @@ export const invitationRouter = createTRPCRouter({
 				});
 			}
 
+			// Fetch discussion separately if this is a discussion invitation
+			let discussion = null;
+			if (invitation.type === "DISCUSSION") {
+				discussion = await ctx.db.discussion.findUnique({
+					where: { id: invitation.targetId },
+					select: {
+						id: true,
+						name: true,
+						description: true,
+						lesson: {
+							select: {
+								title: true,
+								description: true,
+							},
+						},
+					},
+				});
+			}
+
 			return formatInvitationOutput(invitation);
 		}),
 
@@ -384,23 +470,6 @@ export const invitationRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			const invitation = await ctx.db.invitation.findUnique({
 				where: { token: input.token },
-				include: {
-					discussion: {
-						select: {
-							id: true,
-							name: true,
-							isActive: true,
-							maxParticipants: true,
-							_count: {
-								select: {
-									participants: {
-										where: { status: "ACTIVE" },
-									},
-								},
-							},
-						},
-					},
-				},
 			});
 
 			if (!invitation) {
@@ -410,9 +479,13 @@ export const invitationRouter = createTRPCRouter({
 				});
 			}
 
-			// Check if this is an email-based invitation
+			// Fetch discussion info for validation
+			const discussion = await getDiscussionForInvitation(ctx.db, invitation);
+
+			// Check if this is an email-based invitation (not link-based)
+			const isLinkInvitation = invitation.recipientEmail === "";
 			if (
-				!invitation.isLink &&
+				!isLinkInvitation &&
 				invitation.recipientEmail !== ctx.session.user.email
 			) {
 				throw new TRPCError({
@@ -443,8 +516,8 @@ export const invitationRouter = createTRPCRouter({
 
 			// Check discussion capacity
 			if (
-				invitation.discussion!._count.participants >=
-				invitation.discussion!.maxParticipants
+				discussion &&
+				discussion._count.participants >= discussion.maxParticipants
 			) {
 				throw new TRPCError({
 					code: "PRECONDITION_FAILED",
@@ -495,7 +568,6 @@ export const invitationRouter = createTRPCRouter({
 					status: "ACCEPTED" as InvitationStatus,
 					acceptedAt: new Date(),
 					recipientId: ctx.session.user.id,
-					...(invitation.isLink && { usageCount: { increment: 1 } }),
 				},
 			});
 
@@ -522,10 +594,12 @@ export const invitationRouter = createTRPCRouter({
 			}
 
 			return {
-				discussion: {
-					id: invitation.discussion!.id,
-					name: invitation.discussion!.name,
-				},
+				discussion: discussion
+					? {
+							id: discussion.id,
+							name: discussion.name,
+						}
+					: null,
 				userId: ctx.session.user.id,
 				accountCreated,
 			};
@@ -546,9 +620,13 @@ export const invitationRouter = createTRPCRouter({
 				});
 			}
 
-			// Check if this is an email-based invitation
+			// Fetch discussion info for validation
+			const discussion = await getDiscussionForInvitation(ctx.db, invitation);
+
+			// Check if this is an email-based invitation (not link-based)
+			const isLinkInvitation = invitation.recipientEmail === "";
 			if (
-				!invitation.isLink &&
+				!isLinkInvitation &&
 				invitation.recipientEmail !== ctx.session.user.email
 			) {
 				throw new TRPCError({
@@ -625,19 +703,23 @@ export const invitationRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			const invitation = await ctx.db.invitation.findUnique({
 				where: { id: input.invitationId },
-				include: {
-					discussion: {
-						select: {
-							name: true,
-							lesson: {
-								select: {
-									title: true,
-								},
+			});
+
+			// Fetch discussion info if needed
+			let discussionInfo = null;
+			if (invitation && invitation.type === "DISCUSSION") {
+				discussionInfo = await ctx.db.discussion.findUnique({
+					where: { id: invitation.targetId },
+					select: {
+						name: true,
+						lesson: {
+							select: {
+								title: true,
 							},
 						},
 					},
-				},
-			});
+				});
+			}
 
 			if (!invitation) {
 				throw new TRPCError({
@@ -672,14 +754,23 @@ export const invitationRouter = createTRPCRouter({
 
 			// Resend email
 			await emailService.resendInvitation({
-				invitationId: invitation.id,
-				recipientEmail: invitation.recipientEmail,
-				senderName: ctx.session.user.name || "A discussion creator",
-				discussionName: invitation.discussion!.name,
-				lessonTitle: invitation.discussion!.lesson?.title,
-				message: invitation.message,
-				joinUrl: `${process.env.NEXTAUTH_URL}/invitations/${invitation.token}`,
+				originalEmail: invitation.recipientEmail,
+				discussion: {
+					id: invitation.targetId,
+					name: discussionInfo?.name || "Discussion",
+					lesson: discussionInfo?.lesson
+						? {
+								title: discussionInfo.lesson.title,
+							}
+						: undefined,
+				},
+				sender: {
+					name: ctx.session.user.name || "A discussion creator",
+					email: ctx.session.user.email || "",
+				},
+				invitationToken: invitation.token,
 				expiresAt: invitation.expiresAt,
+				personalMessage: invitation.message || undefined,
 			});
 
 			return { success: true };
@@ -725,19 +816,6 @@ export const invitationRouter = createTRPCRouter({
 							email: true,
 						},
 					},
-					discussion: {
-						select: {
-							id: true,
-							name: true,
-							description: true,
-							lesson: {
-								select: {
-									title: true,
-									description: true,
-								},
-							},
-						},
-					},
 				},
 			});
 
@@ -760,24 +838,27 @@ export const invitationRouter = createTRPCRouter({
 		.query(async ({ ctx, input }) => {
 			const invitation = await ctx.db.invitation.findUnique({
 				where: { token: input.token },
-				include: {
-					discussion: {
-						select: {
-							id: true,
-							name: true,
-							isActive: true,
-							maxParticipants: true,
-							_count: {
-								select: {
-									participants: {
-										where: { status: "ACTIVE" },
-									},
+			});
+
+			let discussionInfo = null;
+			if (invitation && invitation.type === "DISCUSSION") {
+				discussionInfo = await ctx.db.discussion.findUnique({
+					where: { id: invitation.targetId },
+					select: {
+						id: true,
+						name: true,
+						isActive: true,
+						maxParticipants: true,
+						_count: {
+							select: {
+								participants: {
+									where: { status: "ACTIVE" },
 								},
 							},
 						},
 					},
-				},
-			});
+				});
+			}
 
 			if (!invitation) {
 				return {
@@ -800,15 +881,15 @@ export const invitationRouter = createTRPCRouter({
 				};
 			}
 
-			if (!invitation.discussion?.isActive) {
+			if (!discussionInfo?.isActive) {
 				return {
 					valid: false,
 					reason: "Discussion is not active",
 				};
 			}
 
-			const participantCount = invitation.discussion._count.participants;
-			if (participantCount >= invitation.discussion.maxParticipants) {
+			const participantCount = discussionInfo._count.participants;
+			if (participantCount >= discussionInfo.maxParticipants) {
 				return {
 					valid: false,
 					reason: "Discussion is full",
@@ -818,10 +899,10 @@ export const invitationRouter = createTRPCRouter({
 			return {
 				valid: true,
 				discussion: {
-					id: invitation.discussion.id,
-					name: invitation.discussion.name,
+					id: discussionInfo.id,
+					name: discussionInfo.name,
 					participantCount,
-					maxParticipants: invitation.discussion.maxParticipants,
+					maxParticipants: discussionInfo.maxParticipants,
 				},
 			};
 		}),

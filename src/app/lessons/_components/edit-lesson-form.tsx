@@ -108,10 +108,10 @@ export function EditLessonForm({
 		}
 	};
 
-	const removeObjective = (index: number) => {
+	const removeObjective = (objectiveToRemove: string) => {
 		setFormData((prev) => ({
 			...prev,
-			objectives: prev.objectives.filter((_, i) => i !== index),
+			objectives: prev.objectives.filter((obj) => obj !== objectiveToRemove),
 		}));
 	};
 
@@ -125,10 +125,10 @@ export function EditLessonForm({
 		}
 	};
 
-	const removeQuestion = (index: number) => {
+	const removeQuestion = (questionToRemove: string) => {
 		setFormData((prev) => ({
 			...prev,
-			keyQuestions: prev.keyQuestions.filter((_, i) => i !== index),
+			keyQuestions: prev.keyQuestions.filter((q) => q !== questionToRemove),
 		}));
 	};
 
@@ -234,9 +234,12 @@ export function EditLessonForm({
 							<Input
 								value={objectiveInput}
 								onChange={(e) => setObjectiveInput(e.target.value)}
-								onKeyDown={(e) =>
-									e.key === "Enter" && (e.preventDefault(), addObjective())
-								}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") {
+										e.preventDefault();
+										addObjective();
+									}
+								}}
 								placeholder="Add a learning objective"
 								className="flex-1"
 							/>
@@ -246,14 +249,18 @@ export function EditLessonForm({
 						</div>
 						{formData.objectives.length > 0 && (
 							<div className="flex flex-wrap gap-2">
-								{formData.objectives.map((objective, index) => (
-									<Badge key={index} variant="secondary" className="gap-1">
+								{formData.objectives.map((objective) => (
+									<Badge
+										key={`objective-${objective}`}
+										variant="secondary"
+										className="gap-1"
+									>
 										{objective}
 										<Button
 											type="button"
 											variant="ghost"
 											size="icon"
-											onClick={() => removeObjective(index)}
+											onClick={() => removeObjective(objective)}
 											className="h-4 w-4 p-0 hover:bg-transparent"
 										>
 											<X className="h-3 w-3" />
@@ -270,9 +277,12 @@ export function EditLessonForm({
 							<Input
 								value={questionInput}
 								onChange={(e) => setQuestionInput(e.target.value)}
-								onKeyDown={(e) =>
-									e.key === "Enter" && (e.preventDefault(), addQuestion())
-								}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") {
+										e.preventDefault();
+										addQuestion();
+									}
+								}}
 								placeholder="Add a key question for discussion"
 								className="flex-1"
 							/>
@@ -282,9 +292,9 @@ export function EditLessonForm({
 						</div>
 						{formData.keyQuestions.length > 0 && (
 							<div className="space-y-2">
-								{formData.keyQuestions.map((question, index) => (
+								{formData.keyQuestions.map((question) => (
 									<div
-										key={index}
+										key={`question-${question}`}
 										className="flex items-start justify-between rounded-md bg-muted px-3 py-2"
 									>
 										<span className="text-sm">{question}</span>
@@ -292,7 +302,7 @@ export function EditLessonForm({
 											type="button"
 											variant="ghost"
 											size="icon"
-											onClick={() => removeQuestion(index)}
+											onClick={() => removeQuestion(question)}
 											className="h-6 w-6 hover:text-destructive"
 										>
 											<X className="h-4 w-4" />
