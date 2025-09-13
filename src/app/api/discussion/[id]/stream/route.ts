@@ -7,7 +7,7 @@
  * Supports participant presence events (join/leave) and message broadcasting.
  */
 
-import { validateInvitationToken } from "@/lib/invitation-jwt";
+import { unifiedTokenService } from "@/lib/invitation-token-service";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { getWebSocketService } from "@/server/services/websocket";
@@ -93,12 +93,12 @@ async function authenticateStreamParticipant(
 		}
 	}
 
-	// Try JWT token authentication
+	// Try token authentication (supports both JWT and database tokens)
 	if (participantToken) {
-		const tokenValidation = validateInvitationToken(participantToken);
+		const tokenValidation = await unifiedTokenService.validateToken(participantToken);
 		if (
 			!tokenValidation.valid ||
-			tokenValidation.claims?.discussionId !== discussionId
+			tokenValidation.token?.discussionId !== discussionId
 		) {
 			throw new Error("Invalid participant token");
 		}
