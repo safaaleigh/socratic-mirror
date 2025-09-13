@@ -8,7 +8,9 @@ import { db } from "@/server/db";
 // Cleanup function
 afterEach(async () => {
 	// Clean up test data
-	await db.invitation.deleteMany({ where: { recipientEmail: { contains: "@test" } } });
+	await db.invitation.deleteMany({
+		where: { recipientEmail: { contains: "@test" } },
+	});
 	await db.discussion.deleteMany({ where: { name: { contains: "Test " } } });
 	await db.user.deleteMany({ where: { email: { contains: "@test" } } });
 });
@@ -17,7 +19,7 @@ afterEach(async () => {
 describe("Expired Invitation Handling", () => {
 	test("should show expired invitation error with clear messaging", async () => {
 		// TDD: This test represents quickstart scenario 2 - expired invitation handling
-		
+
 		// Setup expired invitation
 		const creator = await db.user.create({
 			data: {
@@ -50,16 +52,16 @@ describe("Expired Invitation Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Test validation endpoint - should detect expiration
-		const validation = await caller.invitation.validate({ 
-			token: expiredInvitation.token 
+		const validation = await caller.invitation.validate({
+			token: expiredInvitation.token,
 		});
-		
+
 		expect(validation.valid).toBe(false);
 		expect(validation.reason).toBe("Invitation has expired");
 
 		// Test details endpoint - should throw appropriate error
 		await expect(
-			caller.invitation.getByToken({ token: expiredInvitation.token })
+			caller.invitation.getByToken({ token: expiredInvitation.token }),
 		).rejects.toThrow("Invitation has expired");
 
 		// Test participant join - should prevent joining
@@ -68,7 +70,7 @@ describe("Expired Invitation Handling", () => {
 				discussionId: discussion.id,
 				displayName: "Test Participant",
 				sessionId: "expired-test-session",
-			})
+			}),
 		).rejects.toThrow("Discussion not found"); // Since invitation is expired
 	});
 
@@ -103,16 +105,16 @@ describe("Expired Invitation Handling", () => {
 		});
 
 		// Wait for expiration
-		await new Promise(resolve => setTimeout(resolve, 10));
+		await new Promise((resolve) => setTimeout(resolve, 10));
 
 		const ctx = await createTRPCContext({ req: null, res: null });
 		const caller = appRouter.createCaller(ctx);
 
 		// Access the invitation - should trigger status update
-		const validation = await caller.invitation.validate({ 
-			token: invitationNearExpiry.token 
+		const validation = await caller.invitation.validate({
+			token: invitationNearExpiry.token,
 		});
-		
+
 		expect(validation.valid).toBe(false);
 		expect(validation.reason).toBe("Invitation has expired");
 
@@ -120,7 +122,7 @@ describe("Expired Invitation Handling", () => {
 		const updatedInvitation = await db.invitation.findUnique({
 			where: { id: invitationNearExpiry.id },
 		});
-		
+
 		// Note: Some implementations may update status to EXPIRED automatically
 		expect(updatedInvitation?.status).toMatch(/PENDING|EXPIRED/);
 	});
@@ -158,16 +160,16 @@ describe("Expired Invitation Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Should handle recent expiration consistently
-		const validation = await caller.invitation.validate({ 
-			token: recentlyExpiredInvitation.token 
+		const validation = await caller.invitation.validate({
+			token: recentlyExpiredInvitation.token,
 		});
-		
+
 		expect(validation.valid).toBe(false);
 		expect(validation.reason).toBe("Invitation has expired");
 
 		// Getting details should also fail consistently
 		await expect(
-			caller.invitation.getByToken({ token: recentlyExpiredInvitation.token })
+			caller.invitation.getByToken({ token: recentlyExpiredInvitation.token }),
 		).rejects.toThrow("Invitation has expired");
 	});
 
@@ -216,15 +218,15 @@ describe("Expired Invitation Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Test long expired invitation
-		const longExpiredValidation = await caller.invitation.validate({ 
-			token: longExpiredInvitation.token 
+		const longExpiredValidation = await caller.invitation.validate({
+			token: longExpiredInvitation.token,
 		});
 		expect(longExpiredValidation.valid).toBe(false);
 		expect(longExpiredValidation.reason).toBe("Invitation has expired");
 
 		// Test already processed expired invitation
-		const processedValidation = await caller.invitation.validate({ 
-			token: processedExpiredInvitation.token 
+		const processedValidation = await caller.invitation.validate({
+			token: processedExpiredInvitation.token,
 		});
 		expect(processedValidation.valid).toBe(false);
 		expect(processedValidation.reason).toContain("expired");
@@ -265,14 +267,14 @@ describe("Expired Invitation Handling", () => {
 		// Attempt to join with expired invitation should fail
 		// Note: The actual participant.join contract may not include token validation
 		// This test may need adjustment based on final implementation
-		
+
 		try {
 			await caller.participant.join({
 				discussionId: discussion.id,
 				displayName: "Should Not Join",
 				sessionId: "expired-join-test",
 			});
-			
+
 			// If join succeeds without token validation, that's also acceptable
 			// as long as the invitation token handler page prevents the flow
 		} catch (error) {
@@ -281,8 +283,8 @@ describe("Expired Invitation Handling", () => {
 		}
 
 		// More importantly, verify invitation validation prevents the flow
-		const validation = await caller.invitation.validate({ 
-			token: expiredInvitation.token 
+		const validation = await caller.invitation.validate({
+			token: expiredInvitation.token,
 		});
 		expect(validation.valid).toBe(false);
 	});
@@ -321,16 +323,16 @@ describe("Expired Invitation Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Should handle UTC expiration correctly
-		const validation = await caller.invitation.validate({ 
-			token: timezoneExpiredInvitation.token 
+		const validation = await caller.invitation.validate({
+			token: timezoneExpiredInvitation.token,
 		});
-		
+
 		expect(validation.valid).toBe(false);
 		expect(validation.reason).toBe("Invitation has expired");
 
 		// Consistent behavior across different access methods
 		await expect(
-			caller.invitation.getByToken({ token: timezoneExpiredInvitation.token })
+			caller.invitation.getByToken({ token: timezoneExpiredInvitation.token }),
 		).rejects.toThrow("Invitation has expired");
 	});
 });

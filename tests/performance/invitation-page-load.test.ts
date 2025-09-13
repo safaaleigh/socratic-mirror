@@ -1,6 +1,6 @@
+import { type Browser, type Page, chromium } from "playwright";
 // T013: Performance test page load times (<2s)
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { chromium, Browser, Page } from "playwright";
 
 import { db } from "@/server/db";
 
@@ -17,10 +17,14 @@ describe("Invitation Page Load Performance", () => {
 
 	afterEach(async () => {
 		await browser.close();
-		
+
 		// Clean up test data
-		await db.invitation.deleteMany({ where: { recipientEmail: { contains: "@perftest" } } });
-		await db.discussion.deleteMany({ where: { name: { contains: "Perf Test" } } });
+		await db.invitation.deleteMany({
+			where: { recipientEmail: { contains: "@perftest" } },
+		});
+		await db.discussion.deleteMany({
+			where: { name: { contains: "Perf Test" } },
+		});
 		await db.user.deleteMany({ where: { email: { contains: "@perftest" } } });
 	});
 
@@ -55,27 +59,30 @@ describe("Invitation Page Load Performance", () => {
 
 		// Measure page load time
 		const startTime = Date.now();
-		
+
 		try {
 			await page.goto(`http://localhost:3000/invitations/${invitation.token}`, {
-				waitUntil: 'networkidle',
+				waitUntil: "networkidle",
 				timeout: 10000, // 10 second timeout for safety
 			});
 
 			// Wait for page to be interactive
-			await page.waitForSelector('h1', { timeout: 5000 });
+			await page.waitForSelector("h1", { timeout: 5000 });
 			await page.waitForSelector('button[type="submit"]', { timeout: 5000 });
 
 			const endTime = Date.now();
 			const loadTime = endTime - startTime;
 
 			console.log(`Page load time: ${loadTime}ms`);
-			
+
 			// Should load in under 2 seconds (2000ms)
 			expect(loadTime).toBeLessThan(2000);
 		} catch (error) {
 			// For TDD: Page might not exist yet or server might not be running
-			console.warn("Performance test skipped - page not available:", error.message);
+			console.warn(
+				"Performance test skipped - page not available:",
+				error.message,
+			);
 			expect(error).toBeDefined();
 		}
 	});
@@ -114,10 +121,13 @@ describe("Invitation Page Load Performance", () => {
 
 			// Measure API response time by intercepting network requests
 			const apiResponses: number[] = [];
-			
-			page.on('response', async (response) => {
+
+			page.on("response", async (response) => {
 				const url = response.url();
-				if (url.includes('invitation.validate') || url.includes('invitation.getByToken')) {
+				if (
+					url.includes("invitation.validate") ||
+					url.includes("invitation.getByToken")
+				) {
 					const timing = response.timing();
 					if (timing) {
 						const responseTime = timing.responseEnd - timing.requestStart;
@@ -128,8 +138,8 @@ describe("Invitation Page Load Performance", () => {
 			});
 
 			// Trigger API calls by waiting for content
-			await page.waitForSelector('h1', { timeout: 5000 });
-			
+			await page.waitForSelector("h1", { timeout: 5000 });
+
 			// Wait a bit for API calls to complete
 			await page.waitForTimeout(1000);
 
@@ -188,20 +198,25 @@ describe("Invitation Page Load Performance", () => {
 				browser.newContext(),
 			]);
 
-			const pages = await Promise.all(contexts.map(ctx => ctx.newPage()));
+			const pages = await Promise.all(contexts.map((ctx) => ctx.newPage()));
 
 			// Load different invitation pages concurrently
 			const startTime = Date.now();
-			
-			const loadPromises = pages.slice(0, 3).map((page, index) => 
-				page.goto(`http://localhost:3000/invitations/${invitations[index]!.token}`, {
-					waitUntil: 'networkidle',
-					timeout: 10000,
-				}).then(() => page.waitForSelector('h1', { timeout: 5000 }))
+
+			const loadPromises = pages.slice(0, 3).map((page, index) =>
+				page
+					.goto(
+						`http://localhost:3000/invitations/${invitations[index]!.token}`,
+						{
+							waitUntil: "networkidle",
+							timeout: 10000,
+						},
+					)
+					.then(() => page.waitForSelector("h1", { timeout: 5000 })),
 			);
 
 			await Promise.all(loadPromises);
-			
+
 			const endTime = Date.now();
 			const totalTime = endTime - startTime;
 
@@ -211,7 +226,7 @@ describe("Invitation Page Load Performance", () => {
 			expect(totalTime).toBeLessThan(3000);
 
 			// Close contexts
-			await Promise.all(contexts.map(ctx => ctx.close()));
+			await Promise.all(contexts.map((ctx) => ctx.close()));
 		} catch (error) {
 			// For TDD: Expected to fail until implementation is complete
 			console.warn("Concurrent performance test skipped:", error.message);
@@ -238,8 +253,11 @@ describe("Invitation Page Load Performance", () => {
 		});
 
 		// Create invitation with large message (approaching 500 char limit)
-		const largeMessage = "Welcome to our comprehensive discussion on critical thinking! ".repeat(8);
-		
+		const largeMessage =
+			"Welcome to our comprehensive discussion on critical thinking! ".repeat(
+				8,
+			);
+
 		const invitation = await db.invitation.create({
 			data: {
 				type: "DISCUSSION",
@@ -254,14 +272,14 @@ describe("Invitation Page Load Performance", () => {
 
 		try {
 			const startTime = Date.now();
-			
+
 			await page.goto(`http://localhost:3000/invitations/${invitation.token}`, {
-				waitUntil: 'networkidle',
+				waitUntil: "networkidle",
 			});
 
-			await page.waitForSelector('h1');
+			await page.waitForSelector("h1");
 			await page.waitForSelector('button[type="submit"]');
-			
+
 			const endTime = Date.now();
 			const loadTime = endTime - startTime;
 
@@ -307,25 +325,29 @@ describe("Invitation Page Load Performance", () => {
 
 		try {
 			await page.goto(`http://localhost:3000/invitations/${invitation.token}`);
-			await page.waitForSelector('h1');
+			await page.waitForSelector("h1");
 
 			// Fill in form
 			const nameInput = page.locator('input[placeholder*="name"]');
-			await nameInput.fill('Performance Test User');
+			await nameInput.fill("Performance Test User");
 
 			// Measure form submission time
 			const startTime = Date.now();
-			
+
 			const joinButton = page.locator('button[type="submit"]');
 			await joinButton.click();
 
 			// Wait for response (either success redirect or error)
 			try {
-				await page.waitForURL(/\/discussion\/.*\/participant/, { timeout: 2000 });
+				await page.waitForURL(/\/discussion\/.*\/participant/, {
+					timeout: 2000,
+				});
 				console.log("Form submission succeeded - redirect detected");
 			} catch {
 				// Might show error instead of redirecting in test environment
-				console.log("Form submission completed - no redirect (expected in test)");
+				console.log(
+					"Form submission completed - no redirect (expected in test)",
+				);
 			}
 
 			const endTime = Date.now();
@@ -374,23 +396,23 @@ describe("Invitation Page Load Performance", () => {
 		try {
 			// Simulate slow 3G connection
 			const client = await page.context().newCDPSession(page);
-			await client.send('Network.enable');
-			await client.send('Network.emulateNetworkConditions', {
+			await client.send("Network.enable");
+			await client.send("Network.emulateNetworkConditions", {
 				offline: false,
 				downloadThroughput: 50 * 1024, // 50kb/s
-				uploadThroughput: 20 * 1024,   // 20kb/s  
+				uploadThroughput: 20 * 1024, // 20kb/s
 				latency: 500, // 500ms latency
 			});
 
 			const startTime = Date.now();
-			
+
 			await page.goto(`http://localhost:3000/invitations/${invitation.token}`, {
-				waitUntil: 'networkidle',
+				waitUntil: "networkidle",
 				timeout: 15000, // Longer timeout for slow network
 			});
 
-			await page.waitForSelector('h1');
-			
+			await page.waitForSelector("h1");
+
 			const endTime = Date.now();
 			const loadTime = endTime - startTime;
 

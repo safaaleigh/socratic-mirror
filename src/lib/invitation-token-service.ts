@@ -1,476 +1,503 @@
 /**
  * Unified Invitation Token Service
- * 
+ *
  * Provides a unified interface for generating both database-stored and JWT-based
  * invitation tokens. Uses smart selection logic to choose the optimal token type
  * based on the use case.
  */
 
 import { env } from "@/env";
+import { generateInvitationToken } from "@/lib/invitation-jwt";
 import { db } from "@/server/db";
 import type {
-  IUnifiedTokenService,
-  TokenGenerationOptions,
-  TokenGenerationResult,
-  TokenValidationResponse,
-  TokenSelectionContext,
-  TokenType,
+	IUnifiedTokenService,
+	TokenGenerationOptions,
+	TokenGenerationResult,
+	TokenSelectionContext,
+	TokenType,
+	TokenValidationResponse,
 } from "@/types/invitation-tokens";
-import { 
-  selectOptimalTokenType, 
-  TokenGenerationError, 
-  TokenValidationError 
+import {
+	TokenGenerationError,
+	TokenValidationError,
+	selectOptimalTokenType,
 } from "@/types/invitation-tokens";
-import { generateInvitationToken } from "@/lib/invitation-jwt";
-import type { InvitationType, InvitationStatus } from "@prisma/client";
+import type { InvitationStatus, InvitationType } from "@prisma/client";
 import { z } from "zod";
 
 /**
  * Default expiration times for different token types
  */
 const DEFAULT_EXPIRATION = {
-  database: "7d",   // 7 days for persistent invitations
-  jwt: "24h",       // 24 hours for temporary links
+	database: "7d", // 7 days for persistent invitations
+	jwt: "24h", // 24 hours for temporary links
 } as const;
 
 /**
  * Validation schema for token generation options
  */
 const tokenGenerationSchema = z.object({
-  discussionId: z.string().cuid(),
-  expiresIn: z.string().optional(),
-  senderId: z.string().cuid().optional(),
-  recipientEmail: z.string().email().optional(),
-  message: z.string().optional(),
-  forceType: z.enum(['database', 'jwt']).optional(),
-  expectsHighVolume: z.boolean().optional(),
-  requiresRevocation: z.boolean().optional(),
-  isTemporary: z.boolean().optional(),
+	discussionId: z.string().cuid(),
+	expiresIn: z.string().optional(),
+	senderId: z.string().cuid().optional(),
+	recipientEmail: z.string().email().optional(),
+	message: z.string().optional(),
+	forceType: z.enum(["database", "jwt"]).optional(),
+	expectsHighVolume: z.boolean().optional(),
+	requiresRevocation: z.boolean().optional(),
+	isTemporary: z.boolean().optional(),
 });
 
 /**
  * Unified Token Service Implementation
  */
 export class UnifiedTokenService implements IUnifiedTokenService {
-  /**
-   * Generate an invitation token using smart type selection
-   */
-  async generateToken(options: TokenGenerationOptions): Promise<TokenGenerationResult> {
-    try {
-      // Validate input options
-      const validatedOptions = tokenGenerationSchema.parse(options);
-      
-      // Determine token type
-      const tokenType = this.selectTokenType(validatedOptions);
-      
-      // Generate token based on type
-      if (tokenType === 'database') {
-        return this.generateDatabaseToken(validatedOptions);
-      } else {
-        return this.generateJWTToken(validatedOptions);
-      }
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new TokenGenerationError(
-          `Invalid token generation options: ${error.errors.map(e => e.message).join(', ')}`,
-          'INVALID_OPTIONS',
-          options
-        );
-      }
-      throw error;
-    }
-  }
+	/**
+	 * Generate an invitation token using smart type selection
+	 */
+	async generateToken(
+		options: TokenGenerationOptions,
+	): Promise<TokenGenerationResult> {
+		try {
+			// Validate input options
+			const validatedOptions = tokenGenerationSchema.parse(options);
 
-  /**
-   * Validate any type of token and return unified response
-   */
-  async validateToken(token: string): Promise<TokenValidationResponse> {
-    if (!token || typeof token !== 'string') {
-      return {
-        valid: false,
-        error: 'Token is required and must be a string',
-      };
-    }
+			// Determine token type
+			const tokenType = this.selectTokenType(validatedOptions);
 
-    // Auto-detect token type and validate accordingly
-    if (this.isJWTToken(token)) {
-      return this.validateJWTTokenWithDiscussion(token);
-    } else {
-      return this.validateDatabaseTokenWithDiscussion(token);
-    }
-  }
+			// Generate token based on type
+			if (tokenType === "database") {
+				return this.generateDatabaseToken(validatedOptions);
+			} else {
+				return this.generateJWTToken(validatedOptions);
+			}
+		} catch (error) {
+			if (error instanceof z.ZodError) {
+				throw new TokenGenerationError(
+					`Invalid token generation options: ${error.errors.map((e) => e.message).join(", ")}`,
+					"INVALID_OPTIONS",
+					options,
+				);
+			}
+			throw error;
+		}
+	}
 
-  /**
-   * Revoke a token (only works for database tokens)
-   */
-  async revokeToken(token: string): Promise<boolean> {
-    if (this.isJWTToken(token)) {
-      return false; // JWT tokens cannot be revoked
-    }
+	/**
+	 * Validate any type of token and return unified response
+	 */
+	async validateToken(token: string): Promise<TokenValidationResponse> {
+		if (!token || typeof token !== "string") {
+			return {
+				valid: false,
+				error: "Token is required and must be a string",
+			};
+		}
 
-    try {
-      const result = await db.invitation.update({
-        where: { token },
-        data: { status: 'CANCELLED' },
-      });
-      return !!result;
-    } catch {
-      return false;
-    }
-  }
+		// Auto-detect token type and validate accordingly
+		if (this.isJWTToken(token)) {
+			return this.validateJWTTokenWithDiscussion(token);
+		} else {
+			return this.validateDatabaseTokenWithDiscussion(token);
+		}
+	}
 
-  /**
-   * Check if a token can be revoked
-   */
-  isRevocable(token: string): boolean {
-    return !this.isJWTToken(token);
-  }
+	/**
+	 * Revoke a token (only works for database tokens)
+	 */
+	async revokeToken(token: string): Promise<boolean> {
+		if (this.isJWTToken(token)) {
+			return false; // JWT tokens cannot be revoked
+		}
 
-  /**
-   * Private Methods
-   */
+		try {
+			const result = await db.invitation.update({
+				where: { token },
+				data: { status: "CANCELLED" },
+			});
+			return !!result;
+		} catch {
+			return false;
+		}
+	}
 
-  /**
-   * Select the optimal token type based on context
-   */
-  private selectTokenType(options: TokenGenerationOptions): TokenType {
-    // Use forced type if specified
-    if (options.forceType) {
-      return options.forceType;
-    }
+	/**
+	 * Check if a token can be revoked
+	 */
+	isRevocable(token: string): boolean {
+		return !this.isJWTToken(token);
+	}
 
-    // Build context for smart selection
-    const context: TokenSelectionContext = {
-      senderId: options.senderId,
-      recipientEmail: options.recipientEmail,
-      hasMessage: !!options.message,
-      requiresRevocation: options.requiresRevocation,
-      expectsHighVolume: options.expectsHighVolume,
-      isTemporary: options.isTemporary,
-    };
+	/**
+	 * Private Methods
+	 */
 
-    return selectOptimalTokenType(context);
-  }
+	/**
+	 * Select the optimal token type based on context
+	 */
+	private selectTokenType(options: TokenGenerationOptions): TokenType {
+		// Use forced type if specified
+		if (options.forceType) {
+			return options.forceType;
+		}
 
-  /**
-   * Generate a database-stored invitation token
-   */
-  private async generateDatabaseToken(options: TokenGenerationOptions): Promise<TokenGenerationResult> {
-    try {
-      if (!options.senderId) {
-        throw new TokenGenerationError(
-          'Sender ID is required for database tokens',
-          'INVALID_OPTIONS',
-          options
-        );
-      }
+		// Build context for smart selection
+		const context: TokenSelectionContext = {
+			senderId: options.senderId,
+			recipientEmail: options.recipientEmail,
+			hasMessage: !!options.message,
+			requiresRevocation: options.requiresRevocation,
+			expectsHighVolume: options.expectsHighVolume,
+			isTemporary: options.isTemporary,
+		};
 
-      // Calculate expiration date
-      const expiresIn = options.expiresIn || DEFAULT_EXPIRATION.database;
-      const expiresAt = this.parseExpirationTime(expiresIn);
+		return selectOptimalTokenType(context);
+	}
 
-      // Create invitation in database
-      const invitation = await db.invitation.create({
-        data: {
-          type: 'DISCUSSION' as InvitationType,
-          targetId: options.discussionId,
-          senderId: options.senderId,
-          recipientEmail: options.recipientEmail || '',
-          message: options.message,
-          status: 'PENDING' as InvitationStatus,
-          expiresAt,
-        },
-      });
+	/**
+	 * Generate a database-stored invitation token
+	 */
+	private async generateDatabaseToken(
+		options: TokenGenerationOptions,
+	): Promise<TokenGenerationResult> {
+		try {
+			if (!options.senderId) {
+				throw new TokenGenerationError(
+					"Sender ID is required for database tokens",
+					"INVALID_OPTIONS",
+					options,
+				);
+			}
 
-      return {
-        token: invitation.token,
-        type: 'database',
-        expiresAt: invitation.expiresAt,
-        invitationId: invitation.id,
-      };
-    } catch (error) {
-      throw new TokenGenerationError(
-        `Failed to generate database token: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'DATABASE_ERROR',
-        options
-      );
-    }
-  }
+			// Calculate expiration date
+			const expiresIn = options.expiresIn || DEFAULT_EXPIRATION.database;
+			const expiresAt = this.parseExpirationTime(expiresIn);
 
-  /**
-   * Generate a JWT invitation token
-   */
-  private generateJWTToken(options: TokenGenerationOptions): TokenGenerationResult {
-    try {
-      const expiresIn = options.expiresIn || DEFAULT_EXPIRATION.jwt;
-      const token = generateInvitationToken({
-        discussionId: options.discussionId,
-        expiresIn,
-      });
+			// Create invitation in database
+			const invitation = await db.invitation.create({
+				data: {
+					type: "DISCUSSION" as InvitationType,
+					targetId: options.discussionId,
+					senderId: options.senderId,
+					recipientEmail: options.recipientEmail || "",
+					message: options.message,
+					status: "PENDING" as InvitationStatus,
+					expiresAt,
+				},
+			});
 
-      // Calculate expiration date for consistency
-      const expiresAt = this.parseExpirationTime(expiresIn);
+			return {
+				token: invitation.token,
+				type: "database",
+				expiresAt: invitation.expiresAt,
+				invitationId: invitation.id,
+			};
+		} catch (error) {
+			throw new TokenGenerationError(
+				`Failed to generate database token: ${error instanceof Error ? error.message : "Unknown error"}`,
+				"DATABASE_ERROR",
+				options,
+			);
+		}
+	}
 
-      return {
-        token,
-        type: 'jwt',
-        expiresAt,
-      };
-    } catch (error) {
-      throw new TokenGenerationError(
-        `Failed to generate JWT token: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'JWT_ERROR',
-        options
-      );
-    }
-  }
+	/**
+	 * Generate a JWT invitation token
+	 */
+	private generateJWTToken(
+		options: TokenGenerationOptions,
+	): TokenGenerationResult {
+		try {
+			const expiresIn = options.expiresIn || DEFAULT_EXPIRATION.jwt;
+			const token = generateInvitationToken({
+				discussionId: options.discussionId,
+				expiresIn,
+			});
 
-  /**
-   * Validate a JWT token and include discussion information
-   */
-  private async validateJWTTokenWithDiscussion(token: string): Promise<TokenValidationResponse> {
-    // Import the JWT validation function
-    const { validateInvitationToken } = await import('@/lib/invitation-jwt');
-    
-    const jwtResult = validateInvitationToken(token);
-    
-    if (!jwtResult.valid || !jwtResult.claims) {
-      return {
-        valid: false,
-        error: jwtResult.error,
-      };
-    }
+			// Calculate expiration date for consistency
+			const expiresAt = this.parseExpirationTime(expiresIn);
 
-    // Get discussion information
-    const discussion = await this.getDiscussionInfo(jwtResult.claims.discussionId);
-    
-    if (!discussion.valid) {
-      return {
-        valid: false,
-        error: discussion.error,
-      };
-    }
+			return {
+				token,
+				type: "jwt",
+				expiresAt,
+			};
+		} catch (error) {
+			throw new TokenGenerationError(
+				`Failed to generate JWT token: ${error instanceof Error ? error.message : "Unknown error"}`,
+				"JWT_ERROR",
+				options,
+			);
+		}
+	}
 
-    return {
-      valid: true,
-      token: {
-        type: 'jwt',
-        discussionId: jwtResult.claims.discussionId,
-        expiresAt: new Date(jwtResult.claims.exp * 1000),
-        issuedAt: new Date(jwtResult.claims.iat * 1000),
-      },
-      discussion: discussion.discussion,
-    };
-  }
+	/**
+	 * Validate a JWT token and include discussion information
+	 */
+	private async validateJWTTokenWithDiscussion(
+		token: string,
+	): Promise<TokenValidationResponse> {
+		// Import the JWT validation function
+		const { validateInvitationToken } = await import("@/lib/invitation-jwt");
 
-  /**
-   * Validate a database token and include discussion information
-   */
-  private async validateDatabaseTokenWithDiscussion(token: string): Promise<TokenValidationResponse> {
-    try {
-      // Validate CUID format
-      if (!this.isCUID(token)) {
-        return {
-          valid: false,
-          error: 'Invalid token format',
-        };
-      }
+		const jwtResult = validateInvitationToken(token);
 
-      const invitation = await db.invitation.findUnique({
-        where: { token },
-        include: {
-          sender: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
-      });
+		if (!jwtResult.valid || !jwtResult.claims) {
+			return {
+				valid: false,
+				error: jwtResult.error,
+			};
+		}
 
-      if (!invitation) {
-        return {
-          valid: false,
-          error: 'Invitation not found',
-        };
-      }
+		// Get discussion information
+		const discussion = await this.getDiscussionInfo(
+			jwtResult.claims.discussionId,
+		);
 
-      // Check if expired
-      if (invitation.expiresAt < new Date()) {
-        // Update status if not already expired
-        if (invitation.status === 'PENDING') {
-          await db.invitation.update({
-            where: { id: invitation.id },
-            data: { status: 'EXPIRED' },
-          });
-        }
-        return {
-          valid: false,
-          error: 'Invitation has expired',
-        };
-      }
+		if (!discussion.valid) {
+			return {
+				valid: false,
+				error: discussion.error,
+			};
+		}
 
-      // Check if cancelled
-      if (invitation.status === 'CANCELLED') {
-        return {
-          valid: false,
-          error: 'Invitation has been cancelled',
-        };
-      }
+		return {
+			valid: true,
+			token: {
+				type: "jwt",
+				discussionId: jwtResult.claims.discussionId,
+				expiresAt: new Date(jwtResult.claims.exp * 1000),
+				issuedAt: new Date(jwtResult.claims.iat * 1000),
+			},
+			discussion: discussion.discussion,
+		};
+	}
 
-      // Check if already accepted
-      if (invitation.status === 'ACCEPTED') {
-        return {
-          valid: false,
-          error: 'Invitation has already been used',
-        };
-      }
+	/**
+	 * Validate a database token and include discussion information
+	 */
+	private async validateDatabaseTokenWithDiscussion(
+		token: string,
+	): Promise<TokenValidationResponse> {
+		try {
+			// Validate CUID format
+			if (!this.isCUID(token)) {
+				return {
+					valid: false,
+					error: "Invalid token format",
+				};
+			}
 
-      // Get discussion information
-      const discussion = await this.getDiscussionInfo(invitation.targetId);
-      
-      if (!discussion.valid) {
-        return {
-          valid: false,
-          error: discussion.error,
-        };
-      }
+			const invitation = await db.invitation.findUnique({
+				where: { token },
+				include: {
+					sender: {
+						select: {
+							id: true,
+							name: true,
+							email: true,
+						},
+					},
+				},
+			});
 
-      return {
-        valid: true,
-        token: {
-          type: 'database',
-          id: invitation.id,
-          discussionId: invitation.targetId,
-          expiresAt: invitation.expiresAt,
-          invitationType: invitation.type,
-          targetId: invitation.targetId,
-          status: invitation.status,
-          sender: invitation.sender,
-          recipientEmail: invitation.recipientEmail,
-          recipientId: invitation.recipientId,
-          message: invitation.message,
-          createdAt: invitation.createdAt,
-        },
-        discussion: discussion.discussion,
-      };
-    } catch (error) {
-      return {
-        valid: false,
-        error: 'Failed to validate token',
-      };
-    }
-  }
+			if (!invitation) {
+				return {
+					valid: false,
+					error: "Invitation not found",
+				};
+			}
 
-  /**
-   * Get discussion information and validate its state
-   */
-  private async getDiscussionInfo(discussionId: string) {
-    try {
-      const discussion = await db.discussion.findUnique({
-        where: { id: discussionId },
-        select: {
-          id: true,
-          name: true,
-          isActive: true,
-          maxParticipants: true,
-          closedAt: true,
-          _count: {
-            select: {
-              participants: {
-                where: { leftAt: null },
-              },
-            },
-          },
-        },
-      });
+			// Check if expired
+			if (invitation.expiresAt < new Date()) {
+				// Update status if not already expired
+				if (invitation.status === "PENDING") {
+					await db.invitation.update({
+						where: { id: invitation.id },
+						data: { status: "EXPIRED" },
+					});
+				}
+				return {
+					valid: false,
+					error: "Invitation has expired",
+				};
+			}
 
-      if (!discussion) {
-        return {
-          valid: false,
-          error: 'Discussion not found',
-        };
-      }
+			// Check if cancelled
+			if (invitation.status === "CANCELLED") {
+				return {
+					valid: false,
+					error: "Invitation has been cancelled",
+				};
+			}
 
-      // Determine discussion status
-      const status = this.computeDiscussionStatus(discussion.isActive, discussion.closedAt);
-      
-      if (status !== 'active') {
-        return {
-          valid: false,
-          error: 'Discussion is no longer active',
-        };
-      }
+			// Check if already accepted
+			if (invitation.status === "ACCEPTED") {
+				return {
+					valid: false,
+					error: "Invitation has already been used",
+				};
+			}
 
-      const participantCount = discussion._count.participants;
+			// Get discussion information
+			const discussion = await this.getDiscussionInfo(invitation.targetId);
 
-      // Check capacity
-      if (discussion.maxParticipants && participantCount >= discussion.maxParticipants) {
-        return {
-          valid: false,
-          error: 'Discussion is at capacity',
-        };
-      }
+			if (!discussion.valid) {
+				return {
+					valid: false,
+					error: discussion.error,
+				};
+			}
 
-      return {
-        valid: true,
-        discussion: {
-          id: discussion.id,
-          name: discussion.name,
-          participantCount,
-          maxParticipants: discussion.maxParticipants,
-          isActive: discussion.isActive,
-          status,
-        },
-      };
-    } catch (error) {
-      return {
-        valid: false,
-        error: 'Failed to validate discussion',
-      };
-    }
-  }
+			return {
+				valid: true,
+				token: {
+					type: "database",
+					id: invitation.id,
+					discussionId: invitation.targetId,
+					expiresAt: invitation.expiresAt,
+					invitationType: invitation.type,
+					targetId: invitation.targetId,
+					status: invitation.status,
+					sender: invitation.sender,
+					recipientEmail: invitation.recipientEmail,
+					recipientId: invitation.recipientId,
+					message: invitation.message,
+					createdAt: invitation.createdAt,
+				},
+				discussion: discussion.discussion,
+			};
+		} catch (error) {
+			return {
+				valid: false,
+				error: "Failed to validate token",
+			};
+		}
+	}
 
-  /**
-   * Helper methods
-   */
+	/**
+	 * Get discussion information and validate its state
+	 */
+	private async getDiscussionInfo(discussionId: string) {
+		try {
+			const discussion = await db.discussion.findUnique({
+				where: { id: discussionId },
+				select: {
+					id: true,
+					name: true,
+					isActive: true,
+					maxParticipants: true,
+					closedAt: true,
+					_count: {
+						select: {
+							participants: {
+								where: { leftAt: null },
+							},
+						},
+					},
+				},
+			});
 
-  private isJWTToken(token: string): boolean {
-    return token.includes('.') && token.split('.').length === 3;
-  }
+			if (!discussion) {
+				return {
+					valid: false,
+					error: "Discussion not found",
+				};
+			}
 
-  private isCUID(token: string): boolean {
-    return /^[a-z0-9]{25}$/.test(token);
-  }
+			// Determine discussion status
+			const status = this.computeDiscussionStatus(
+				discussion.isActive,
+				discussion.closedAt,
+			);
 
-  private parseExpirationTime(expiresIn: string): Date {
-    const now = new Date();
-    
-    // Parse common duration formats
-    const match = expiresIn.match(/^(\d+)([smhdw])$/);
-    if (!match) {
-      throw new Error(`Invalid expiration format: ${expiresIn}`);
-    }
+			if (status !== "active") {
+				return {
+					valid: false,
+					error: "Discussion is no longer active",
+				};
+			}
 
-    const [, amount, unit] = match;
-    const value = parseInt(amount!, 10);
+			const participantCount = discussion._count.participants;
 
-    switch (unit) {
-      case 's': return new Date(now.getTime() + value * 1000);
-      case 'm': return new Date(now.getTime() + value * 60 * 1000);
-      case 'h': return new Date(now.getTime() + value * 60 * 60 * 1000);
-      case 'd': return new Date(now.getTime() + value * 24 * 60 * 60 * 1000);
-      case 'w': return new Date(now.getTime() + value * 7 * 24 * 60 * 60 * 1000);
-      default: throw new Error(`Unsupported time unit: ${unit}`);
-    }
-  }
+			// Check capacity
+			if (
+				discussion.maxParticipants &&
+				participantCount >= discussion.maxParticipants
+			) {
+				return {
+					valid: false,
+					error: "Discussion is at capacity",
+				};
+			}
 
-  private computeDiscussionStatus(isActive: boolean, closedAt: Date | null): 'active' | 'closed' | 'cancelled' {
-    if (!isActive) return 'cancelled';
-    if (closedAt && closedAt <= new Date()) return 'closed';
-    return 'active';
-  }
+			return {
+				valid: true,
+				discussion: {
+					id: discussion.id,
+					name: discussion.name,
+					participantCount,
+					maxParticipants: discussion.maxParticipants,
+					isActive: discussion.isActive,
+					status,
+				},
+			};
+		} catch (error) {
+			return {
+				valid: false,
+				error: "Failed to validate discussion",
+			};
+		}
+	}
+
+	/**
+	 * Helper methods
+	 */
+
+	private isJWTToken(token: string): boolean {
+		return token.includes(".") && token.split(".").length === 3;
+	}
+
+	private isCUID(token: string): boolean {
+		return /^[a-z0-9]{25}$/.test(token);
+	}
+
+	private parseExpirationTime(expiresIn: string): Date {
+		const now = new Date();
+
+		// Parse common duration formats
+		const match = expiresIn.match(/^(\d+)([smhdw])$/);
+		if (!match) {
+			throw new Error(`Invalid expiration format: ${expiresIn}`);
+		}
+
+		const [, amount, unit] = match;
+		const value = Number.parseInt(amount!, 10);
+
+		switch (unit) {
+			case "s":
+				return new Date(now.getTime() + value * 1000);
+			case "m":
+				return new Date(now.getTime() + value * 60 * 1000);
+			case "h":
+				return new Date(now.getTime() + value * 60 * 60 * 1000);
+			case "d":
+				return new Date(now.getTime() + value * 24 * 60 * 60 * 1000);
+			case "w":
+				return new Date(now.getTime() + value * 7 * 24 * 60 * 60 * 1000);
+			default:
+				throw new Error(`Unsupported time unit: ${unit}`);
+		}
+	}
+
+	private computeDiscussionStatus(
+		isActive: boolean,
+		closedAt: Date | null,
+	): "active" | "closed" | "cancelled" {
+		if (!isActive) return "cancelled";
+		if (closedAt && closedAt <= new Date()) return "closed";
+		return "active";
+	}
 }
 
 /**
@@ -481,14 +508,15 @@ export const unifiedTokenService = new UnifiedTokenService();
 /**
  * Convenience functions for common operations
  */
-export const generateInvitationTokenUnified = (options: TokenGenerationOptions) =>
-  unifiedTokenService.generateToken(options);
+export const generateInvitationTokenUnified = (
+	options: TokenGenerationOptions,
+) => unifiedTokenService.generateToken(options);
 
 export const validateInvitationTokenUnified = (token: string) =>
-  unifiedTokenService.validateToken(token);
+	unifiedTokenService.validateToken(token);
 
 export const revokeInvitationToken = (token: string) =>
-  unifiedTokenService.revokeToken(token);
+	unifiedTokenService.revokeToken(token);
 
 export const isTokenRevocable = (token: string) =>
-  unifiedTokenService.isRevocable(token);
+	unifiedTokenService.isRevocable(token);

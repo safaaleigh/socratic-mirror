@@ -203,7 +203,7 @@ export default function ParticipantDiscussionPage() {
 	}
 
 	const discussion = validation.discussion;
-	
+
 	if (!discussion) {
 		return (
 			<div className="min-h-screen bg-background">
@@ -248,9 +248,7 @@ export default function ParticipantDiscussionPage() {
 								</div>
 								<div className="flex flex-col items-center rounded-lg bg-muted/50 p-3">
 									<CheckCircle className="mb-1 h-4 w-4 text-green-500" />
-									<span className="font-medium text-sm">
-										Active
-									</span>
+									<span className="font-medium text-sm">Active</span>
 									<span className="text-muted-foreground text-xs">Status</span>
 								</div>
 							</div>

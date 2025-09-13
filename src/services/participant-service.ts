@@ -82,7 +82,15 @@ function validateSessionId(sessionId: string): void {
 	}
 }
 
-function formatParticipantInfo(participant: any): ParticipantInfo {
+function formatParticipantInfo(participant: {
+	id: string;
+	discussionId: string;
+	displayName: string;
+	sessionId: string;
+	joinedAt: Date;
+	leftAt: Date | null;
+	ipAddress: string | null;
+}): ParticipantInfo {
 	return {
 		id: participant.id,
 		discussionId: participant.discussionId,
@@ -123,6 +131,9 @@ export class ParticipantService {
 				maxParticipants: true,
 				_count: {
 					select: {
+						participants: {
+							where: { status: "ACTIVE" },
+						},
 						anonymousParticipants: {
 							where: { leftAt: null },
 						},
@@ -145,10 +156,12 @@ export class ParticipantService {
 			});
 		}
 
-		// Check participant limits
+		// Check participant limits (count both authenticated and anonymous participants)
+		const currentActiveParticipants =
+			discussion._count.participants + discussion._count.anonymousParticipants;
 		if (
 			discussion.maxParticipants &&
-			discussion._count.anonymousParticipants >= discussion.maxParticipants
+			currentActiveParticipants >= discussion.maxParticipants
 		) {
 			throw new TRPCError({
 				code: "PRECONDITION_FAILED",
@@ -190,7 +203,15 @@ export class ParticipantService {
 		}
 
 		// Create or reactivate participant
-		let participant;
+		let participant: {
+			id: string;
+			discussionId: string;
+			displayName: string;
+			sessionId: string;
+			joinedAt: Date;
+			leftAt: Date | null;
+			ipAddress: string | null;
+		};
 		if (existingParticipant?.leftAt) {
 			// Reactivate existing participant
 			participant = await this.db.participant.update({
@@ -244,7 +265,15 @@ export class ParticipantService {
 			});
 		}
 
-		let updatedParticipant;
+		let updatedParticipant: {
+			id: string;
+			discussionId: string;
+			displayName: string;
+			sessionId: string;
+			joinedAt: Date;
+			leftAt: Date | null;
+			ipAddress: string | null;
+		};
 
 		if (status === "leave") {
 			if (participant.leftAt) {

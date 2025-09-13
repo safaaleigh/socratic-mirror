@@ -8,7 +8,9 @@ import { db } from "@/server/db";
 // Cleanup function
 afterEach(async () => {
 	// Clean up test data (minimal cleanup needed for invalid token tests)
-	await db.invitation.deleteMany({ where: { recipientEmail: { contains: "@test" } } });
+	await db.invitation.deleteMany({
+		where: { recipientEmail: { contains: "@test" } },
+	});
 	await db.discussion.deleteMany({ where: { name: { contains: "Test " } } });
 	await db.user.deleteMany({ where: { email: { contains: "@test" } } });
 });
@@ -17,21 +19,21 @@ afterEach(async () => {
 describe("Invalid Token Handling", () => {
 	test("should handle non-existent tokens gracefully", async () => {
 		// TDD: This test represents quickstart scenario 3 - invalid token handling
-		
+
 		const ctx = await createTRPCContext({ req: null, res: null });
 		const caller = appRouter.createCaller(ctx);
 
 		// Test validation with non-existent token
-		const validation = await caller.invitation.validate({ 
-			token: "cm123nonexistent456token789" 
+		const validation = await caller.invitation.validate({
+			token: "cm123nonexistent456token789",
 		});
-		
+
 		expect(validation.valid).toBe(false);
 		expect(validation.reason).toBe("Invitation not found");
 
 		// Test getting details with non-existent token
 		await expect(
-			caller.invitation.getByToken({ token: "cm123nonexistent456token789" })
+			caller.invitation.getByToken({ token: "cm123nonexistent456token789" }),
 		).rejects.toThrow("Invitation not found");
 	});
 
@@ -41,26 +43,22 @@ describe("Invalid Token Handling", () => {
 
 		// Test various malformed token formats
 		const malformedTokens = [
-			"invalid_token_123",           // Invalid format
-			"",                           // Empty string
-			"short",                      // Too short
-			"cm123",                      // Valid prefix but too short
-			"not-a-cuid-at-all-really",  // Wrong format entirely
+			"invalid_token_123", // Invalid format
+			"", // Empty string
+			"short", // Too short
+			"cm123", // Valid prefix but too short
+			"not-a-cuid-at-all-really", // Wrong format entirely
 			"123456789012345678901234567890", // Wrong format, too long
-			"cm123-abc-456-def",         // Hyphens not allowed in CUID
-			"CM123ABC456DEF789",         // Uppercase not allowed
+			"cm123-abc-456-def", // Hyphens not allowed in CUID
+			"CM123ABC456DEF789", // Uppercase not allowed
 		];
 
 		for (const token of malformedTokens) {
 			// Validation should throw schema validation error
-			await expect(
-				caller.invitation.validate({ token })
-			).rejects.toThrow();
+			await expect(caller.invitation.validate({ token })).rejects.toThrow();
 
 			// Getting details should also throw schema validation error
-			await expect(
-				caller.invitation.getByToken({ token })
-			).rejects.toThrow();
+			await expect(caller.invitation.getByToken({ token })).rejects.toThrow();
 		}
 	});
 
@@ -70,27 +68,23 @@ describe("Invalid Token Handling", () => {
 
 		// Test tokens with special characters (should be rejected by schema)
 		const specialCharTokens = [
-			"cm123abc@456def789",        // @ symbol
-			"cm123abc#456def789",        // # symbol  
-			"cm123abc$456def789",        // $ symbol
-			"cm123abc%456def789",        // % symbol
-			"cm123abc&456def789",        // & symbol
-			"cm123abc*456def789",        // * symbol
-			"cm123abc+456def789",        // + symbol
-			"cm123abc=456def789",        // = symbol
-			"cm123abc?456def789",        // ? symbol
-			"cm123abc!456def789",        // ! symbol
+			"cm123abc@456def789", // @ symbol
+			"cm123abc#456def789", // # symbol
+			"cm123abc$456def789", // $ symbol
+			"cm123abc%456def789", // % symbol
+			"cm123abc&456def789", // & symbol
+			"cm123abc*456def789", // * symbol
+			"cm123abc+456def789", // + symbol
+			"cm123abc=456def789", // = symbol
+			"cm123abc?456def789", // ? symbol
+			"cm123abc!456def789", // ! symbol
 		];
 
 		for (const token of specialCharTokens) {
 			// Should throw schema validation error due to invalid CUID format
-			await expect(
-				caller.invitation.validate({ token })
-			).rejects.toThrow();
+			await expect(caller.invitation.validate({ token })).rejects.toThrow();
 
-			await expect(
-				caller.invitation.getByToken({ token })
-			).rejects.toThrow();
+			await expect(caller.invitation.getByToken({ token })).rejects.toThrow();
 		}
 	});
 
@@ -100,20 +94,20 @@ describe("Invalid Token Handling", () => {
 
 		// Test null token (should throw schema validation error)
 		await expect(
-			caller.invitation.validate({ token: null as any })
+			caller.invitation.validate({ token: null as any }),
 		).rejects.toThrow();
 
 		await expect(
-			caller.invitation.getByToken({ token: null as any })
+			caller.invitation.getByToken({ token: null as any }),
 		).rejects.toThrow();
 
 		// Test undefined token (should throw schema validation error)
 		await expect(
-			caller.invitation.validate({ token: undefined as any })
+			caller.invitation.validate({ token: undefined as any }),
 		).rejects.toThrow();
 
 		await expect(
-			caller.invitation.getByToken({ token: undefined as any })
+			caller.invitation.getByToken({ token: undefined as any }),
 		).rejects.toThrow();
 	});
 
@@ -123,26 +117,26 @@ describe("Invalid Token Handling", () => {
 
 		// Test valid CUID format but non-existent token
 		const validFormatNonExistent = "cm123validformat456butnotfound";
-		
-		const validation = await caller.invitation.validate({ 
-			token: validFormatNonExistent 
+
+		const validation = await caller.invitation.validate({
+			token: validFormatNonExistent,
 		});
 		expect(validation.valid).toBe(false);
 		expect(validation.reason).toBe("Invitation not found");
 
 		await expect(
-			caller.invitation.getByToken({ token: validFormatNonExistent })
+			caller.invitation.getByToken({ token: validFormatNonExistent }),
 		).rejects.toThrow("Invitation not found");
 
 		// Test invalid format (should throw different error)
 		const invalidFormat = "definitely-not-a-cuid";
-		
+
 		await expect(
-			caller.invitation.validate({ token: invalidFormat })
+			caller.invitation.validate({ token: invalidFormat }),
 		).rejects.toThrow(); // Schema validation error, different from not found
 
 		await expect(
-			caller.invitation.getByToken({ token: invalidFormat })
+			caller.invitation.getByToken({ token: invalidFormat }),
 		).rejects.toThrow(); // Schema validation error
 	});
 
@@ -180,17 +174,17 @@ describe("Invalid Token Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// This invitation should work fine (baseline test)
-		const validation = await caller.invitation.validate({ 
-			token: validInvitation.token 
+		const validation = await caller.invitation.validate({
+			token: validInvitation.token,
 		});
 		expect(validation.valid).toBe(true);
 
 		// Test with hypothetical wrong resource type token
 		// (This is more of a forward-compatibility test)
 		const hypotheticalWrongTypeToken = "cm123wrongtype456resource789";
-		
-		const wrongTypeValidation = await caller.invitation.validate({ 
-			token: hypotheticalWrongTypeToken 
+
+		const wrongTypeValidation = await caller.invitation.validate({
+			token: hypotheticalWrongTypeToken,
 		});
 		expect(wrongTypeValidation.valid).toBe(false);
 		expect(wrongTypeValidation.reason).toBe("Invitation not found");
@@ -203,14 +197,14 @@ describe("Invalid Token Handling", () => {
 		// Test multiple concurrent invalid token requests
 		const invalidTokens = [
 			"cm123invalid456token001",
-			"cm123invalid456token002", 
+			"cm123invalid456token002",
 			"cm123invalid456token003",
 			"cm123invalid456token004",
 			"cm123invalid456token005",
 		];
 
-		const validationPromises = invalidTokens.map(token => 
-			caller.invitation.validate({ token })
+		const validationPromises = invalidTokens.map((token) =>
+			caller.invitation.validate({ token }),
 		);
 
 		const results = await Promise.all(validationPromises);
@@ -228,13 +222,13 @@ describe("Invalid Token Handling", () => {
 
 		// Test extremely long token (should be rejected by schema)
 		const veryLongToken = "cm" + "a".repeat(1000); // Very long invalid token
-		
+
 		await expect(
-			caller.invitation.validate({ token: veryLongToken })
+			caller.invitation.validate({ token: veryLongToken }),
 		).rejects.toThrow(); // Schema validation should reject this
 
 		await expect(
-			caller.invitation.getByToken({ token: veryLongToken })
+			caller.invitation.getByToken({ token: veryLongToken }),
 		).rejects.toThrow(); // Schema validation should reject this
 	});
 
@@ -251,15 +245,15 @@ describe("Invalid Token Handling", () => {
 
 		for (const token of nonExistentTokens) {
 			const validation = await caller.invitation.validate({ token });
-			
+
 			// Should consistently return the same error message
 			expect(validation.valid).toBe(false);
 			expect(validation.reason).toBe("Invitation not found");
 
 			// getByToken should also have consistent error message
-			await expect(
-				caller.invitation.getByToken({ token })
-			).rejects.toThrow("Invitation not found");
+			await expect(caller.invitation.getByToken({ token })).rejects.toThrow(
+				"Invitation not found",
+			);
 		}
 	});
 
@@ -280,9 +274,9 @@ describe("Invalid Token Handling", () => {
 			expect(validation.valid).toBe(false);
 			expect(validation.reason).toBe("Invitation not found");
 
-			await expect(
-				caller.invitation.getByToken({ token })
-			).rejects.toThrow("Invitation not found");
+			await expect(caller.invitation.getByToken({ token })).rejects.toThrow(
+				"Invitation not found",
+			);
 		}
 	});
 
@@ -290,7 +284,7 @@ describe("Invalid Token Handling", () => {
 		// Setup a valid invitation for baseline
 		const creator = await db.user.create({
 			data: {
-				name: "Case Test Creator", 
+				name: "Case Test Creator",
 				email: "case@test.com",
 			},
 		});
@@ -319,20 +313,20 @@ describe("Invalid Token Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Test valid token (baseline)
-		const validResult = await caller.invitation.validate({ 
-			token: validInvitation.token 
+		const validResult = await caller.invitation.validate({
+			token: validInvitation.token,
 		});
 		expect(validResult.valid).toBe(true);
 
 		// Test uppercase version of same token (should be treated as different)
 		const uppercaseToken = validInvitation.token.toUpperCase();
-		
+
 		// Uppercase should either:
 		// 1. Fail schema validation (preferred), or
 		// 2. Be treated as not found
 		try {
-			const uppercaseResult = await caller.invitation.validate({ 
-				token: uppercaseToken 
+			const uppercaseResult = await caller.invitation.validate({
+				token: uppercaseToken,
 			});
 			// If it doesn't throw, it should at least be invalid
 			expect(uppercaseResult.valid).toBe(false);

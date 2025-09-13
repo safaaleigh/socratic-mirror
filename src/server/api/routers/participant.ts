@@ -113,9 +113,15 @@ export const participantRouter = createTRPCRouter({
 						isActive: true,
 						maxParticipants: true,
 						closedAt: true,
-						anonymousParticipants: {
-							where: { leftAt: null },
-							select: { id: true },
+						_count: {
+							select: {
+								participants: {
+									where: { status: "ACTIVE" },
+								},
+								anonymousParticipants: {
+									where: { leftAt: null },
+								},
+							},
 						},
 					},
 				});
@@ -141,7 +147,9 @@ export const participantRouter = createTRPCRouter({
 					};
 				}
 
-				const participantCount = discussion.anonymousParticipants.length;
+				const participantCount =
+					discussion._count.participants +
+					discussion._count.anonymousParticipants;
 
 				// Check if discussion is at capacity
 				if (
@@ -187,9 +195,15 @@ export const participantRouter = createTRPCRouter({
 					isActive: true,
 					maxParticipants: true,
 					closedAt: true,
-					anonymousParticipants: {
-						where: { leftAt: null },
-						select: { id: true },
+					_count: {
+						select: {
+							participants: {
+								where: { status: "ACTIVE" },
+							},
+							anonymousParticipants: {
+								where: { leftAt: null },
+							},
+						},
 					},
 				},
 			});
@@ -213,7 +227,9 @@ export const participantRouter = createTRPCRouter({
 				});
 			}
 
-			const participantCount = discussion.anonymousParticipants.length;
+			const participantCount =
+				discussion._count.participants +
+				discussion._count.anonymousParticipants;
 
 			// Check capacity
 			if (

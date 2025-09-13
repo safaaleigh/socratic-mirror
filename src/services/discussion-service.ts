@@ -39,16 +39,7 @@ export interface TokenValidationResult {
 const DEFAULT_EXPIRATION_HOURS = 24;
 const JWT_SECRET = env.AUTH_SECRET || "fallback-secret-for-development";
 
-// Utility functions
-function generateSecureToken(): string {
-	const chars =
-		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-	let token = "";
-	for (let i = 0; i < 32; i++) {
-		token += chars.charAt(Math.floor(Math.random() * chars.length));
-	}
-	return token;
-}
+// Utility functions removed - generateSecureToken was unused
 
 export class DiscussionService {
 	private db: PrismaClient;
@@ -137,6 +128,9 @@ export class DiscussionService {
 					},
 					_count: {
 						select: {
+							participants: {
+								where: { status: "ACTIVE" },
+							},
 							anonymousParticipants: {
 								where: { leftAt: null },
 							},
@@ -175,7 +169,9 @@ export class DiscussionService {
 					description: discussion.description,
 					isActive: discussion.isActive,
 					maxParticipants: discussion.maxParticipants,
-					currentParticipantCount: discussion._count.anonymousParticipants,
+					currentParticipantCount:
+						discussion._count.participants +
+						discussion._count.anonymousParticipants,
 					lesson: discussion.lesson
 						? {
 								title: discussion.lesson.title,

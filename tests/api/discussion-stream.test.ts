@@ -1,3 +1,4 @@
+import { generateInvitationToken } from "@/lib/invitation-jwt";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
 	cleanupDatabase,
@@ -5,7 +6,6 @@ import {
 	createTestUser,
 	testDb,
 } from "../db-setup";
-import { generateInvitationToken } from "@/lib/invitation-jwt";
 
 /**
  * Contract tests for GET /api/discussion/[id]/stream endpoint
@@ -134,7 +134,7 @@ describe("GET /api/discussion/[id]/stream - Contract Tests", () => {
 			// Current implementation: 200 OK (session ID not validated against participant record)
 			// Note: This might be a security consideration for future improvement
 			expect(response.status).toBe(200);
-			
+
 			// Clean up the stream
 			if (response.body) {
 				const reader = response.body.getReader();
@@ -204,7 +204,9 @@ describe("GET /api/discussion/[id]/stream - Contract Tests", () => {
 
 			// Contract: Connection should be established successfully
 			expect(response.status).toBe(200);
-			expect(response.headers.get("content-type")).toContain("text/event-stream");
+			expect(response.headers.get("content-type")).toContain(
+				"text/event-stream",
+			);
 
 			// Clean up connection
 			if (response.body) {
@@ -223,9 +225,11 @@ describe("GET /api/discussion/[id]/stream - Contract Tests", () => {
 				},
 			});
 
-			// Contract: Connection should be established successfully  
+			// Contract: Connection should be established successfully
 			expect(response.status).toBe(200);
-			expect(response.headers.get("content-type")).toContain("text/event-stream");
+			expect(response.headers.get("content-type")).toContain(
+				"text/event-stream",
+			);
 
 			// Clean up connection
 			if (response.body) {
@@ -246,9 +250,11 @@ describe("GET /api/discussion/[id]/stream - Contract Tests", () => {
 
 			// Contract: Connection should be established successfully
 			expect(response.status).toBe(200);
-			expect(response.headers.get("content-type")).toContain("text/event-stream");
+			expect(response.headers.get("content-type")).toContain(
+				"text/event-stream",
+			);
 
-			// Clean up connection  
+			// Clean up connection
 			if (response.body) {
 				const reader = response.body.getReader();
 				reader.cancel();
@@ -340,20 +346,20 @@ describe("GET /api/discussion/[id]/stream - Contract Tests", () => {
 				let foundKeepalive = false;
 				let attempts = 0;
 				const maxAttempts = 10;
-				
+
 				while (attempts < maxAttempts && !foundKeepalive) {
 					try {
 						const { value, done } = await reader.read();
 						if (done) break;
-						
+
 						if (value) {
 							const chunk = new TextDecoder().decode(value);
 							buffer += chunk;
-							
+
 							// Parse individual SSE events from buffer
-							const events = buffer.split('\n\n');
+							const events = buffer.split("\n\n");
 							buffer = events.pop() || ""; // Keep incomplete event in buffer
-							
+
 							for (const event of events) {
 								if (event.trim()) {
 									// Check if this is a keepalive event
@@ -372,11 +378,13 @@ describe("GET /api/discussion/[id]/stream - Contract Tests", () => {
 						break;
 					}
 				}
-				
+
 				reader.releaseLock();
-				
+
 				if (!foundKeepalive) {
-					throw new Error(`No keepalive event found after ${attempts} attempts. Buffer: ${buffer}`);
+					throw new Error(
+						`No keepalive event found after ${attempts} attempts. Buffer: ${buffer}`,
+					);
 				}
 			}
 		});

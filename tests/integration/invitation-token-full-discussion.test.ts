@@ -8,9 +8,15 @@ import { db } from "@/server/db";
 // Cleanup function
 afterEach(async () => {
 	// Clean up test data
-	await db.participant.deleteMany({ where: { displayName: { contains: "Test" } } });
-	await db.invitation.deleteMany({ where: { recipientEmail: { contains: "@test" } } });
-	await db.discussionParticipant.deleteMany({ where: { userId: { contains: "test-" } } });
+	await db.participant.deleteMany({
+		where: { displayName: { contains: "Test" } },
+	});
+	await db.invitation.deleteMany({
+		where: { recipientEmail: { contains: "@test" } },
+	});
+	await db.discussionParticipant.deleteMany({
+		where: { userId: { contains: "test-" } },
+	});
 	await db.discussion.deleteMany({ where: { name: { contains: "Test " } } });
 	await db.user.deleteMany({ where: { email: { contains: "@test" } } });
 });
@@ -19,7 +25,7 @@ afterEach(async () => {
 describe("Full Discussion Handling", () => {
 	test("should prevent joining when discussion is at capacity", async () => {
 		// TDD: This test represents quickstart scenario 4 - full discussion handling
-		
+
 		// Setup discussion at capacity
 		const creator = await db.user.create({
 			data: {
@@ -51,7 +57,7 @@ describe("Full Discussion Handling", () => {
 		await db.discussionParticipant.create({
 			data: {
 				discussionId: fullDiscussion.id,
-				userId: "test-participant-2", 
+				userId: "test-participant-2",
 				role: "PARTICIPANT",
 				status: "ACTIVE",
 			},
@@ -73,10 +79,10 @@ describe("Full Discussion Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Validation should detect full capacity
-		const validation = await caller.invitation.validate({ 
-			token: invitation.token 
+		const validation = await caller.invitation.validate({
+			token: invitation.token,
 		});
-		
+
 		expect(validation.valid).toBe(false);
 		expect(validation.reason).toBe("Discussion is full");
 
@@ -86,7 +92,7 @@ describe("Full Discussion Handling", () => {
 				discussionId: fullDiscussion.id,
 				displayName: "Should Not Join",
 				sessionId: "full-discussion-test",
-			})
+			}),
 		).rejects.toThrow(); // Should throw capacity error
 	});
 
@@ -144,10 +150,10 @@ describe("Full Discussion Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Should still be valid (2/3 capacity)
-		const validation = await caller.invitation.validate({ 
-			token: invitation.token 
+		const validation = await caller.invitation.validate({
+			token: invitation.token,
 		});
-		
+
 		expect(validation.valid).toBe(true);
 		expect(validation.discussion?.participantCount).toBe(2);
 		expect(validation.discussion?.maxParticipants).toBe(3);
@@ -161,10 +167,10 @@ describe("Full Discussion Handling", () => {
 			});
 
 			expect(joinResult.participant.displayName).toBe("Last Participant");
-			
+
 			// Now discussion should be full
-			const postJoinValidation = await caller.invitation.validate({ 
-				token: invitation.token 
+			const postJoinValidation = await caller.invitation.validate({
+				token: invitation.token,
 			});
 			expect(postJoinValidation.valid).toBe(false);
 			expect(postJoinValidation.reason).toBe("Discussion is full");
@@ -238,10 +244,10 @@ describe("Full Discussion Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Should be valid because only 1 active participant (inactive ones don't count)
-		const validation = await caller.invitation.validate({ 
-			token: invitation.token 
+		const validation = await caller.invitation.validate({
+			token: invitation.token,
 		});
-		
+
 		expect(validation.valid).toBe(true);
 		expect(validation.discussion?.participantCount).toBe(1); // Only active participants
 		expect(validation.discussion?.maxParticipants).toBe(2);
@@ -293,10 +299,10 @@ describe("Full Discussion Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Should still be valid despite many participants
-		const validation = await caller.invitation.validate({ 
-			token: invitation.token 
+		const validation = await caller.invitation.validate({
+			token: invitation.token,
 		});
-		
+
 		expect(validation.valid).toBe(true);
 		expect(validation.discussion?.participantCount).toBe(10);
 		expect(validation.discussion?.maxParticipants).toBe(null);
@@ -366,7 +372,7 @@ describe("Full Discussion Handling", () => {
 			}),
 			caller.participant.join({
 				discussionId: nearFullDiscussion.id,
-				displayName: "Concurrent 2", 
+				displayName: "Concurrent 2",
 				sessionId: "race-session-2",
 			}),
 			caller.participant.join({
@@ -378,17 +384,19 @@ describe("Full Discussion Handling", () => {
 
 		try {
 			const results = await Promise.allSettled(concurrentJoinPromises);
-			
+
 			// At most one should succeed (the one that gets the last spot)
-			const successful = results.filter(r => r.status === 'fulfilled');
-			const failed = results.filter(r => r.status === 'rejected');
-			
+			const successful = results.filter((r) => r.status === "fulfilled");
+			const failed = results.filter((r) => r.status === "rejected");
+
 			expect(successful.length).toBeLessThanOrEqual(1);
 			expect(failed.length).toBeGreaterThanOrEqual(2);
-			
+
 			if (successful.length === 1) {
 				const successResult = successful[0] as PromiseFulfilledResult<any>;
-				expect(successResult.value.participant.displayName).toMatch(/Concurrent \d/);
+				expect(successResult.value.participant.displayName).toMatch(
+					/Concurrent \d/,
+				);
 			}
 		} catch (error) {
 			// Race conditions are complex - some failure is acceptable in TDD phase
@@ -407,7 +415,7 @@ describe("Full Discussion Handling", () => {
 
 		const fullDiscussion = await db.discussion.create({
 			data: {
-				name: "Test Error Messages Discussion", 
+				name: "Test Error Messages Discussion",
 				description: "Testing capacity error messages",
 				isActive: true,
 				maxParticipants: 1, // Minimum capacity
@@ -440,10 +448,10 @@ describe("Full Discussion Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Test validation error message
-		const validation = await caller.invitation.validate({ 
-			token: invitation.token 
+		const validation = await caller.invitation.validate({
+			token: invitation.token,
 		});
-		
+
 		expect(validation.valid).toBe(false);
 		expect(validation.reason).toBe("Discussion is full");
 
@@ -453,7 +461,7 @@ describe("Full Discussion Handling", () => {
 				discussionId: fullDiscussion.id,
 				displayName: "Cannot Join",
 				sessionId: "error-message-test",
-			})
+			}),
 		).rejects.toThrow(/full|capacity|at capacity/i); // Should mention capacity issue
 	});
 
@@ -501,8 +509,8 @@ describe("Full Discussion Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Should initially be valid (1/5 capacity)
-		const initialValidation = await caller.invitation.validate({ 
-			token: invitation.token 
+		const initialValidation = await caller.invitation.validate({
+			token: invitation.token,
 		});
 		expect(initialValidation.valid).toBe(true);
 
@@ -513,8 +521,8 @@ describe("Full Discussion Handling", () => {
 		});
 
 		// Should now be invalid due to capacity change
-		const updatedValidation = await caller.invitation.validate({ 
-			token: invitation.token 
+		const updatedValidation = await caller.invitation.validate({
+			token: invitation.token,
 		});
 		expect(updatedValidation.valid).toBe(false);
 		expect(updatedValidation.reason).toBe("Discussion is full");

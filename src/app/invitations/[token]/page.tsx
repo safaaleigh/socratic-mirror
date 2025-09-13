@@ -99,7 +99,9 @@ export default function InvitationTokenPage({
 			// });
 
 			// Redirect to discussion participant view with token parameter
-			router.push(`/discussion/${data.participant.discussionId}/participant?token=${token}`);
+			router.push(
+				`/discussion/${data.participant.discussionId}/participant?token=${token}`,
+			);
 		},
 		onError: (error) => {
 			// TODO: Add toast notification
@@ -243,7 +245,9 @@ export default function InvitationTokenPage({
 				<Card>
 					<CardHeader>
 						<CardTitle className="text-red-600">Error</CardTitle>
-						<CardDescription>Discussion information unavailable</CardDescription>
+						<CardDescription>
+							Discussion information unavailable
+						</CardDescription>
 					</CardHeader>
 				</Card>
 			</div>
@@ -263,20 +267,24 @@ export default function InvitationTokenPage({
 					{tokenInfo && (
 						<div className="space-y-2 text-sm">
 							{/* Show sender info for database tokens */}
-							{tokenInfo.type === 'database' && 'sender' in tokenInfo && (
+							{tokenInfo.type === "database" && "sender" in tokenInfo && (
 								<div>
 									<span className="font-medium">Invited by:</span>{" "}
-									{tokenInfo.sender?.name || tokenInfo.sender?.email || "Unknown"}
+									{tokenInfo.sender?.name ||
+										tokenInfo.sender?.email ||
+										"Unknown"}
 								</div>
 							)}
 
 							{/* Show message for database tokens */}
-							{tokenInfo.type === 'database' && 'message' in tokenInfo && tokenInfo.message && (
-								<div>
-									<span className="font-medium">Message:</span>{" "}
-									<span className="italic">"{tokenInfo.message}"</span>
-								</div>
-							)}
+							{tokenInfo.type === "database" &&
+								"message" in tokenInfo &&
+								tokenInfo.message && (
+									<div>
+										<span className="font-medium">Message:</span>{" "}
+										<span className="italic">"{tokenInfo.message}"</span>
+									</div>
+								)}
 
 							<div className="text-gray-600">
 								<span className="font-medium">Expires:</span>{" "}
@@ -285,7 +293,9 @@ export default function InvitationTokenPage({
 
 							{/* Show token type indicator */}
 							<div className="text-gray-500 text-xs">
-								{tokenInfo.type === 'database' ? 'Secure invitation' : 'Quick share link'}
+								{tokenInfo.type === "database"
+									? "Secure invitation"
+									: "Quick share link"}
 							</div>
 						</div>
 					)}

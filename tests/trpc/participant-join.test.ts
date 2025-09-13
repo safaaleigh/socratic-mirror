@@ -8,8 +8,12 @@ import { db } from "@/server/db";
 // Cleanup function
 afterEach(async () => {
 	// Clean up test data
-	await db.participant.deleteMany({ where: { displayName: { contains: "Test" } } });
-	await db.invitation.deleteMany({ where: { recipientEmail: { contains: "@test" } } });
+	await db.participant.deleteMany({
+		where: { displayName: { contains: "Test" } },
+	});
+	await db.invitation.deleteMany({
+		where: { recipientEmail: { contains: "@test" } },
+	});
 	await db.discussion.deleteMany({ where: { name: { contains: "Test " } } });
 	await db.user.deleteMany({ where: { email: { contains: "@test" } } });
 });
@@ -47,7 +51,7 @@ describe("participant.join Contract", () => {
 				discussionId: "cm123discussion789",
 				displayName: "", // Empty name
 				sessionId: "test-session-id",
-			})
+			}),
 		).rejects.toThrow();
 
 		// Too long name should fail validation
@@ -56,7 +60,7 @@ describe("participant.join Contract", () => {
 				discussionId: "cm123discussion789",
 				displayName: "a".repeat(51), // 51 characters, exceeds max 50
 				sessionId: "test-session-id",
-			})
+			}),
 		).rejects.toThrow();
 	});
 
@@ -136,7 +140,7 @@ describe("participant.join Contract", () => {
 				discussionId: discussion.id,
 				displayName: "Alex Chen",
 				sessionId: "test-session-id",
-			})
+			}),
 		).rejects.toThrow("Discussion is at capacity");
 	});
 
@@ -149,7 +153,7 @@ describe("participant.join Contract", () => {
 				discussionId: "cm123nonexistent789",
 				displayName: "Alex Chen",
 				sessionId: "test-session-id",
-			})
+			}),
 		).rejects.toThrow("Discussion not found");
 	});
 
@@ -179,7 +183,7 @@ describe("participant.join Contract", () => {
 				discussionId: inactiveDiscussion.id,
 				displayName: "Alex Chen",
 				sessionId: "test-session-id",
-			})
+			}),
 		).rejects.toThrow("Discussion has ended");
 	});
 

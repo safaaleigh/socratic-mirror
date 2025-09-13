@@ -47,11 +47,11 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 			sessionId: `session_${Date.now()}_${Math.random().toString(36).substring(7)}`,
 			joinedAt: new Date(),
 		};
-		
+
 		await testDb.participant.create({
 			data: participantData,
 		});
-		
+
 		participant = {
 			id: participantData.id,
 			displayName: participantData.displayName,

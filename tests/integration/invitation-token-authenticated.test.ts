@@ -5,12 +5,18 @@ import { appRouter } from "@/server/api/root";
 import { createTRPCContext } from "@/server/api/trpc";
 import { db } from "@/server/db";
 
-// Cleanup function  
+// Cleanup function
 afterEach(async () => {
 	// Clean up test data
-	await db.participant.deleteMany({ where: { displayName: { contains: "Test" } } });
-	await db.invitation.deleteMany({ where: { recipientEmail: { contains: "@test" } } });
-	await db.discussionParticipant.deleteMany({ where: { userId: { contains: "test-" } } });
+	await db.participant.deleteMany({
+		where: { displayName: { contains: "Test" } },
+	});
+	await db.invitation.deleteMany({
+		where: { recipientEmail: { contains: "@test" } },
+	});
+	await db.discussionParticipant.deleteMany({
+		where: { userId: { contains: "test-" } },
+	});
 	await db.discussion.deleteMany({ where: { name: { contains: "Test " } } });
 	await db.user.deleteMany({ where: { email: { contains: "@test" } } });
 });
@@ -20,7 +26,7 @@ describe("Authenticated User Flow", () => {
 	test("should handle authenticated users with invitation links", async () => {
 		// TDD: This test represents quickstart scenario 5 - authenticated user flow
 		// Note: This test will need to be adjusted based on authentication implementation
-		
+
 		// Setup test data
 		const creator = await db.user.create({
 			data: {
@@ -58,12 +64,12 @@ describe("Authenticated User Flow", () => {
 		});
 
 		// Create authenticated context (simulating logged-in user)
-		const authCtx = await createTRPCContext({ 
-			req: null, 
+		const authCtx = await createTRPCContext({
+			req: null,
 			res: null,
 			// Note: In real implementation, this would include session data
 		});
-		
+
 		// Mock session for authenticated user (this may need adjustment)
 		(authCtx as any).session = {
 			user: {
@@ -76,19 +82,23 @@ describe("Authenticated User Flow", () => {
 		const caller = appRouter.createCaller(authCtx);
 
 		// Authenticated users should be able to validate invitations
-		const validation = await caller.invitation.validate({ 
-			token: invitation.token 
+		const validation = await caller.invitation.validate({
+			token: invitation.token,
 		});
 		expect(validation.valid).toBe(true);
 
 		// Should be able to get invitation details
-		const details = await caller.invitation.getByToken({ token: invitation.token });
+		const details = await caller.invitation.getByToken({
+			token: invitation.token,
+		});
 		expect(details.sender.name).toBe("Auth Test Creator");
 
 		// Should be able to accept invitation as authenticated user
 		try {
-			const acceptResult = await caller.invitation.accept({ token: invitation.token });
-			
+			const acceptResult = await caller.invitation.accept({
+				token: invitation.token,
+			});
+
 			expect(acceptResult.userId).toBe(authenticatedUser.id);
 			expect(acceptResult.discussion?.id).toBe(discussion.id);
 
@@ -181,8 +191,8 @@ describe("Authenticated User Flow", () => {
 		const authCaller = appRouter.createCaller(authCtx);
 
 		try {
-			const authResult = await authCaller.invitation.accept({ 
-				token: invitation.token 
+			const authResult = await authCaller.invitation.accept({
+				token: invitation.token,
 			});
 
 			// Authenticated user should be created in discussionParticipant table
@@ -247,14 +257,16 @@ describe("Authenticated User Flow", () => {
 		const caller = appRouter.createCaller(authCtx);
 
 		// Get invitation details - should work for authenticated users
-		const details = await caller.invitation.getByToken({ token: invitation.token });
+		const details = await caller.invitation.getByToken({
+			token: invitation.token,
+		});
 		expect(details.sender.name).toBe("Prefill Creator");
 
 		// In the UI, the authenticated user's name would be pre-filled
 		// Test that accepting with authenticated user uses their real name
 		try {
-			const acceptResult = await caller.invitation.accept({ 
-				token: invitation.token 
+			const acceptResult = await caller.invitation.accept({
+				token: invitation.token,
 			});
 
 			// Should use authenticated user's actual name
@@ -324,16 +336,18 @@ describe("Authenticated User Flow", () => {
 		const caller = appRouter.createCaller(authCtx);
 
 		// Should be able to get invitation details
-		const details = await caller.invitation.getByToken({ 
-			token: emailInvitation.token 
+		const details = await caller.invitation.getByToken({
+			token: emailInvitation.token,
 		});
 		expect(details.recipientEmail).toBe(invitedUser.email);
-		expect(details.message).toBe("You're specifically invited to this discussion");
+		expect(details.message).toBe(
+			"You're specifically invited to this discussion",
+		);
 
 		// Should be able to accept the invitation
 		try {
-			const acceptResult = await caller.invitation.accept({ 
-				token: emailInvitation.token 
+			const acceptResult = await caller.invitation.accept({
+				token: emailInvitation.token,
 			});
 
 			expect(acceptResult.userId).toBe(invitedUser.id);
@@ -360,7 +374,7 @@ describe("Authenticated User Flow", () => {
 
 		const wrongUser = await db.user.create({
 			data: {
-				name: "Wrong User", 
+				name: "Wrong User",
 				email: "wrong@test.com",
 			},
 		});
@@ -400,7 +414,7 @@ describe("Authenticated User Flow", () => {
 
 		// Should reject wrong user
 		await expect(
-			wrongUserCaller.invitation.accept({ token: emailInvitation.token })
+			wrongUserCaller.invitation.accept({ token: emailInvitation.token }),
 		).rejects.toThrow(/not for your email/i);
 
 		// Correct user should be able to accept
@@ -415,8 +429,8 @@ describe("Authenticated User Flow", () => {
 		const correctUserCaller = appRouter.createCaller(correctUserCtx);
 
 		try {
-			const acceptResult = await correctUserCaller.invitation.accept({ 
-				token: emailInvitation.token 
+			const acceptResult = await correctUserCaller.invitation.accept({
+				token: emailInvitation.token,
 			});
 
 			expect(acceptResult.userId).toBe(intendedUser.id);
@@ -484,8 +498,8 @@ describe("Authenticated User Flow", () => {
 
 		// Should be able to rejoin via invitation
 		try {
-			const acceptResult = await caller.invitation.accept({ 
-				token: invitation.token 
+			const acceptResult = await caller.invitation.accept({
+				token: invitation.token,
 			});
 
 			expect(acceptResult.userId).toBe(returningUser.id);

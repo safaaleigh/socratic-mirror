@@ -8,12 +8,18 @@ import { db } from "@/server/db";
 // Cleanup function
 afterEach(async () => {
 	// Clean up test data and restore mocks
-	await db.participant.deleteMany({ where: { displayName: { contains: "Test" } } });
-	await db.invitation.deleteMany({ where: { recipientEmail: { contains: "@test" } } });
-	await db.discussionParticipant.deleteMany({ where: { userId: { contains: "test-" } } });
+	await db.participant.deleteMany({
+		where: { displayName: { contains: "Test" } },
+	});
+	await db.invitation.deleteMany({
+		where: { recipientEmail: { contains: "@test" } },
+	});
+	await db.discussionParticipant.deleteMany({
+		where: { userId: { contains: "test-" } },
+	});
 	await db.discussion.deleteMany({ where: { name: { contains: "Test " } } });
 	await db.user.deleteMany({ where: { email: { contains: "@test" } } });
-	
+
 	// Restore all mocks
 	vi.restoreAllMocks();
 });
@@ -22,7 +28,7 @@ afterEach(async () => {
 describe("Network Error Handling", () => {
 	test("should handle database connection failures gracefully", async () => {
 		// TDD: This test represents quickstart scenario 7 - network error handling
-		
+
 		// Setup test data first
 		const creator = await db.user.create({
 			data: {
@@ -53,7 +59,7 @@ describe("Network Error Handling", () => {
 
 		// Mock database error after setup
 		const originalFindUnique = db.invitation.findUnique;
-		vi.spyOn(db.invitation, 'findUnique').mockImplementation(() => {
+		vi.spyOn(db.invitation, "findUnique").mockImplementation(() => {
 			throw new Error("Database connection failed");
 		});
 
@@ -103,16 +109,17 @@ describe("Network Error Handling", () => {
 		});
 
 		// Mock slow database response
-		vi.spyOn(db.invitation, 'findUnique').mockImplementation(async (args) => {
+		vi.spyOn(db.invitation, "findUnique").mockImplementation(async (args) => {
 			// Simulate slow response
-			await new Promise(resolve => setTimeout(resolve, 100));
-			
+			await new Promise((resolve) => setTimeout(resolve, 100));
+
 			// Return original data after delay
-			const originalMethod = db.invitation.findUnique.getMockImplementation() !== 
-				db.invitation.findUnique ? 
-				db.invitation.findUnique : 
-				(db as any).$delegate.invitation.findUnique;
-			
+			const originalMethod =
+				db.invitation.findUnique.getMockImplementation() !==
+				db.invitation.findUnique
+					? db.invitation.findUnique
+					: (db as any).$delegate.invitation.findUnique;
+
 			// For test purposes, just return the invitation
 			if (args?.where?.token === invitation.token) {
 				return invitation;
@@ -126,9 +133,11 @@ describe("Network Error Handling", () => {
 		// Should handle slow response (within reason)
 		const startTime = Date.now();
 		try {
-			const result = await caller.invitation.validate({ token: invitation.token });
+			const result = await caller.invitation.validate({
+				token: invitation.token,
+			});
 			const endTime = Date.now();
-			
+
 			// Should complete despite slowness
 			expect(result).toBeDefined();
 			expect(endTime - startTime).toBeGreaterThan(50); // Verify delay occurred
@@ -169,7 +178,7 @@ describe("Network Error Handling", () => {
 		});
 
 		// Mock returning corrupted data
-		vi.spyOn(db.invitation, 'findUnique').mockResolvedValue({
+		vi.spyOn(db.invitation, "findUnique").mockResolvedValue({
 			...corruptedInvitation,
 			targetId: "invalid-discussion-id", // Corrupted reference
 		} as any);
@@ -179,10 +188,10 @@ describe("Network Error Handling", () => {
 
 		// Should handle corrupted data gracefully
 		try {
-			const result = await caller.invitation.validate({ 
-				token: corruptedInvitation.token 
+			const result = await caller.invitation.validate({
+				token: corruptedInvitation.token,
 			});
-			
+
 			// Should detect invalid state
 			expect(result.valid).toBe(false);
 		} catch (error) {
@@ -226,31 +235,33 @@ describe("Network Error Handling", () => {
 
 		// Mock intermittent failures (fail 50% of the time)
 		let callCount = 0;
-		vi.spyOn(db.invitation, 'findUnique').mockImplementation(async (args) => {
+		vi.spyOn(db.invitation, "findUnique").mockImplementation(async (args) => {
 			callCount++;
-			
+
 			if (callCount % 2 === 0) {
 				throw new Error("Intermittent network failure");
 			}
-			
+
 			// Return success for odd-numbered calls
 			const token = args?.where?.token;
-			return invitations.find(inv => inv.token === token) || null;
+			return invitations.find((inv) => inv.token === token) || null;
 		});
 
 		const ctx = await createTRPCContext({ req: null, res: null });
 		const caller = appRouter.createCaller(ctx);
 
 		// Test multiple concurrent requests
-		const validationPromises = invitations.map(invitation => 
-			caller.invitation.validate({ token: invitation.token }).catch(e => ({ error: e }))
+		const validationPromises = invitations.map((invitation) =>
+			caller.invitation
+				.validate({ token: invitation.token })
+				.catch((e) => ({ error: e })),
 		);
 
 		const results = await Promise.all(validationPromises);
 
 		// Some should succeed, some should fail
-		const successes = results.filter(r => !('error' in r));
-		const failures = results.filter(r => 'error' in r);
+		const successes = results.filter((r) => !("error" in r));
+		const failures = results.filter((r) => "error" in r);
 
 		// Should have both successes and failures due to intermittent errors
 		expect(successes.length).toBeGreaterThan(0);
@@ -287,14 +298,14 @@ describe("Network Error Handling", () => {
 		});
 
 		// Mock scenario where invitation validation works but details don't
-		vi.spyOn(db.invitation, 'findUnique').mockImplementation(async (args) => {
+		vi.spyOn(db.invitation, "findUnique").mockImplementation(async (args) => {
 			const include = (args as any)?.include;
-			
+
 			if (include?.sender) {
 				// Fail when trying to get detailed info with sender
 				throw new Error("User service temporarily unavailable");
 			}
-			
+
 			// Succeed for basic validation
 			return invitation;
 		});
@@ -304,8 +315,8 @@ describe("Network Error Handling", () => {
 
 		// Basic validation should work
 		try {
-			const validation = await caller.invitation.validate({ 
-				token: invitation.token 
+			const validation = await caller.invitation.validate({
+				token: invitation.token,
 			});
 			expect(validation.valid).toBe(true);
 		} catch (error) {
@@ -354,8 +365,8 @@ describe("Network Error Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Test retryable error (temporary network issue)
-		vi.spyOn(db.invitation, 'findUnique').mockRejectedValueOnce(
-			new Error("ECONNRESET: Connection reset by peer")
+		vi.spyOn(db.invitation, "findUnique").mockRejectedValueOnce(
+			new Error("ECONNRESET: Connection reset by peer"),
 		);
 
 		try {
@@ -367,7 +378,7 @@ describe("Network Error Handling", () => {
 
 		// Test non-retryable error (validation error)
 		vi.restoreAllMocks();
-		
+
 		try {
 			await caller.invitation.validate({ token: "invalid-format" });
 		} catch (error) {
@@ -388,7 +399,7 @@ describe("Network Error Handling", () => {
 				expectedType: /timeout|connection/i,
 			},
 			{
-				name: "Database unavailable", 
+				name: "Database unavailable",
 				mockError: new Error("ECONNREFUSED: Connection refused"),
 				expectedType: /connection|unavailable/i,
 			},
@@ -400,15 +411,17 @@ describe("Network Error Handling", () => {
 		];
 
 		for (const scenario of errorScenarios) {
-			vi.spyOn(db.invitation, 'findUnique').mockRejectedValueOnce(scenario.mockError);
-			
+			vi.spyOn(db.invitation, "findUnique").mockRejectedValueOnce(
+				scenario.mockError,
+			);
+
 			try {
 				await caller.invitation.validate({ token: "cm123test456token789" });
 			} catch (error) {
 				// Should provide meaningful error context
 				expect(error.message).toMatch(scenario.expectedType);
 			}
-			
+
 			vi.restoreAllMocks();
 		}
 	});
@@ -446,8 +459,8 @@ describe("Network Error Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Mock failure during participant creation
-		vi.spyOn(db.participant, 'create').mockRejectedValueOnce(
-			new Error("Database transaction failed")
+		vi.spyOn(db.participant, "create").mockRejectedValueOnce(
+			new Error("Database transaction failed"),
 		);
 
 		// Attempt to join - should fail cleanly

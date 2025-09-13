@@ -42,7 +42,6 @@ const chatRequestSchema = z.object({
 	sessionId: z.string(),
 });
 
-
 // ==================== Helper Functions ====================
 
 /**
@@ -251,14 +250,17 @@ async function createMessage(
 /**
  * Generate streaming response compatible with Vercel AI SDK
  */
-function createStreamingResponse(message: {
-	id: string;
-	content: string;
-	senderName: string;
-	senderType: string;
-	createdAt: string;
-	originalId?: string;
-}, discussionId: string): Response {
+function createStreamingResponse(
+	message: {
+		id: string;
+		content: string;
+		senderName: string;
+		senderType: string;
+		createdAt: string;
+		originalId?: string;
+	},
+	discussionId: string,
+): Response {
 	const encoder = new TextEncoder();
 
 	// Use original message ID from client for AI SDK compatibility
@@ -299,9 +301,7 @@ function createStreamingResponse(message: {
 	const readable = new ReadableStream({
 		start(controller) {
 			// Send the message data (AI SDK format)
-			controller.enqueue(
-				encoder.encode(`0:${JSON.stringify(messageData)}\n`),
-			);
+			controller.enqueue(encoder.encode(`0:${JSON.stringify(messageData)}\n`));
 			// Send broadcast notification
 			controller.enqueue(
 				encoder.encode(`1:${JSON.stringify(broadcastData)}\n`),
@@ -353,8 +353,12 @@ export async function POST(
 			);
 		}
 
-		const { messages, participantId, discussionId: requestDiscussionId, sessionId } =
-			chatRequestSchema.parse(body);
+		const {
+			messages,
+			participantId,
+			discussionId: requestDiscussionId,
+			sessionId,
+		} = chatRequestSchema.parse(body);
 
 		// Verify discussion ID matches
 		if (requestDiscussionId !== discussionId) {
@@ -393,17 +397,16 @@ export async function POST(
 		);
 
 		// Create message and broadcast
-		const savedMessage = await createMessage(
-			discussionId,
-			messageText,
-			auth,
-		);
+		const savedMessage = await createMessage(discussionId, messageText, auth);
 
 		// Return AI SDK compatible streaming response with original message ID
-		return createStreamingResponse({
-			...savedMessage,
-			originalId: lastMessage.id,
-		}, discussionId);
+		return createStreamingResponse(
+			{
+				...savedMessage,
+				originalId: lastMessage.id,
+			},
+			discussionId,
+		);
 	} catch (error) {
 		console.error("Chat API error:", error);
 

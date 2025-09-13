@@ -95,7 +95,8 @@ async function authenticateStreamParticipant(
 
 	// Try token authentication (supports both JWT and database tokens)
 	if (participantToken) {
-		const tokenValidation = await unifiedTokenService.validateToken(participantToken);
+		const tokenValidation =
+			await unifiedTokenService.validateToken(participantToken);
 		if (
 			!tokenValidation.valid ||
 			tokenValidation.token?.discussionId !== discussionId
@@ -267,7 +268,7 @@ function setupWebSocketListeners(
 	// Always use keepalive fallback since WebSocket service is not initialized
 	// Use shorter interval for better responsiveness and reliable testing
 	const keepaliveIntervalMs = 2000; // 2 seconds for all environments
-	
+
 	const keepaliveInterval = setInterval(() => {
 		try {
 			const keepaliveEvent: StreamEvent = {

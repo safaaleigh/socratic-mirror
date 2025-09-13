@@ -8,9 +8,15 @@ import { db } from "@/server/db";
 // Cleanup function
 afterEach(async () => {
 	// Clean up test data
-	await db.participant.deleteMany({ where: { displayName: { contains: "Test" } } });
-	await db.invitation.deleteMany({ where: { recipientEmail: { contains: "@test" } } });
-	await db.discussionParticipant.deleteMany({ where: { userId: { contains: "test-" } } });
+	await db.participant.deleteMany({
+		where: { displayName: { contains: "Test" } },
+	});
+	await db.invitation.deleteMany({
+		where: { recipientEmail: { contains: "@test" } },
+	});
+	await db.discussionParticipant.deleteMany({
+		where: { userId: { contains: "test-" } },
+	});
 	await db.discussion.deleteMany({ where: { name: { contains: "Test " } } });
 	await db.user.deleteMany({ where: { email: { contains: "@test" } } });
 });
@@ -20,7 +26,7 @@ describe("Valid Invitation Flow (Anonymous User)", () => {
 	test("should complete full anonymous user invitation acceptance flow", async () => {
 		// TDD: This test will fail until the invitation token handler page is implemented
 		// This test represents the complete user journey from quickstart scenario 1
-		
+
 		// Step 1: Setup test data (simulating existing invitation system)
 		const creator = await db.user.create({
 			data: {
@@ -55,13 +61,15 @@ describe("Valid Invitation Flow (Anonymous User)", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Step 2: Validate invitation token (simulating page load)
-		const validation = await caller.invitation.validate({ token: invitation.token });
+		const validation = await caller.invitation.validate({
+			token: invitation.token,
+		});
 		expect(validation.valid).toBe(true);
 		expect(validation.discussion?.name).toBe("Test Critical Thinking Workshop");
 
 		// Step 3: Get invitation details (simulating page display)
-		const invitationDetails = await caller.invitation.getByToken({ 
-			token: invitation.token 
+		const invitationDetails = await caller.invitation.getByToken({
+			token: invitation.token,
 		});
 		expect(invitationDetails.sender.name).toBe("Dr. Test Creator");
 		expect(invitationDetails.message).toBe("Looking forward to your insights!");
@@ -131,7 +139,9 @@ describe("Valid Invitation Flow (Anonymous User)", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Get invitation details (no authentication required)
-		const details = await caller.invitation.getByToken({ token: invitation.token });
+		const details = await caller.invitation.getByToken({
+			token: invitation.token,
+		});
 
 		// Verify all expected information is present
 		expect(details.sender.name).toBe("Prof. Anonymous Test");
@@ -172,7 +182,7 @@ describe("Valid Invitation Flow (Anonymous User)", () => {
 				discussionId: discussion.id,
 				displayName: "", // Empty name
 				sessionId: "test-session-id",
-			})
+			}),
 		).rejects.toThrow();
 
 		// Test too long name rejection
@@ -181,7 +191,7 @@ describe("Valid Invitation Flow (Anonymous User)", () => {
 				discussionId: discussion.id,
 				displayName: "a".repeat(51), // 51 characters, exceeds max 50
 				sessionId: "test-session-id",
-			})
+			}),
 		).rejects.toThrow();
 
 		// Test valid name acceptance
@@ -250,8 +260,12 @@ describe("Valid Invitation Flow (Anonymous User)", () => {
 
 			// Should receive message history
 			expect(joinResult.messageHistory).toHaveLength(2);
-			expect(joinResult.messageHistory[0].content).toBe("Welcome to our discussion!");
-			expect(joinResult.messageHistory[1].content).toBe("I'm excited to get started!");
+			expect(joinResult.messageHistory[0].content).toBe(
+				"Welcome to our discussion!",
+			);
+			expect(joinResult.messageHistory[1].content).toBe(
+				"I'm excited to get started!",
+			);
 
 			// Messages should be in chronological order (oldest first)
 			expect(joinResult.messageHistory[0].senderType).toBe("system");
@@ -305,13 +319,12 @@ describe("Valid Invitation Flow (Anonymous User)", () => {
 
 		try {
 			const results = await Promise.all(joinPromises);
-			
+
 			// All should succeed if within capacity
 			expect(results).toHaveLength(3);
 			results.forEach((result, index) => {
 				expect(result.participant.displayName).toBe(`Participant ${index + 1}`);
 			});
-
 		} catch (error) {
 			// Expected in TDD phase - concurrent joins may fail until properly implemented
 			expect(error).toBeDefined();

@@ -8,7 +8,9 @@ import { db } from "@/server/db";
 // Cleanup function
 afterEach(async () => {
 	// Clean up test data
-	await db.invitation.deleteMany({ where: { recipientEmail: { contains: "@test" } } });
+	await db.invitation.deleteMany({
+		where: { recipientEmail: { contains: "@test" } },
+	});
 	await db.discussion.deleteMany({ where: { name: { contains: "Test " } } });
 	await db.user.deleteMany({ where: { email: { contains: "@test" } } });
 });
@@ -22,7 +24,7 @@ describe("invitation.getByToken Contract", () => {
 		// Valid CUID format should not throw validation error
 		// For TDD: Should fail due to missing test data, not schema validation
 		await expect(
-			caller.invitation.getByToken({ token: "cm123abc456def789ghi012jkl" })
+			caller.invitation.getByToken({ token: "cm123abc456def789ghi012jkl" }),
 		).rejects.toThrow("Invitation not found");
 	});
 
@@ -59,7 +61,9 @@ describe("invitation.getByToken Contract", () => {
 		const ctx = await createTRPCContext({ req: null, res: null });
 		const caller = appRouter.createCaller(ctx);
 
-		const result = await caller.invitation.getByToken({ token: invitation.token });
+		const result = await caller.invitation.getByToken({
+			token: invitation.token,
+		});
 
 		// Verify response matches contract schema
 		expect(result).toEqual({
@@ -89,7 +93,7 @@ describe("invitation.getByToken Contract", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		await expect(
-			caller.invitation.getByToken({ token: "cm123invalid456token" })
+			caller.invitation.getByToken({ token: "cm123invalid456token" }),
 		).rejects.toThrow("Invitation not found");
 	});
 
@@ -126,7 +130,7 @@ describe("invitation.getByToken Contract", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		await expect(
-			caller.invitation.getByToken({ token: expiredInvitation.token })
+			caller.invitation.getByToken({ token: expiredInvitation.token }),
 		).rejects.toThrow("Invitation has expired");
 	});
 
@@ -162,7 +166,9 @@ describe("invitation.getByToken Contract", () => {
 		const ctx = await createTRPCContext({ req: null, res: null });
 		const caller = appRouter.createCaller(ctx);
 
-		const result = await caller.invitation.getByToken({ token: invitation.token });
+		const result = await caller.invitation.getByToken({
+			token: invitation.token,
+		});
 
 		// Verify sender information is included correctly
 		expect(result.sender).toEqual({
@@ -250,7 +256,9 @@ describe("invitation.getByToken Contract", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Should work without authentication
-		const result = await caller.invitation.getByToken({ token: invitation.token });
+		const result = await caller.invitation.getByToken({
+			token: invitation.token,
+		});
 
 		expect(result.id).toBe(invitation.id);
 		expect(result.sender.name).toBe("Public Test User");

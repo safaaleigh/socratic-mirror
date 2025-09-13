@@ -8,8 +8,12 @@ import { db } from "@/server/db";
 // Cleanup function
 afterEach(async () => {
 	// Clean up test data
-	await db.invitation.deleteMany({ where: { recipientEmail: { contains: "@test" } } });
-	await db.discussionParticipant.deleteMany({ where: { userId: { contains: "test-" } } });
+	await db.invitation.deleteMany({
+		where: { recipientEmail: { contains: "@test" } },
+	});
+	await db.discussionParticipant.deleteMany({
+		where: { userId: { contains: "test-" } },
+	});
 	await db.discussion.deleteMany({ where: { name: { contains: "Test " } } });
 	await db.user.deleteMany({ where: { email: { contains: "@test" } } });
 });
@@ -22,10 +26,10 @@ describe("invitation.validate Contract", () => {
 
 		// Valid CUID format should not throw validation error
 		// For TDD: This should fail due to missing test data, not schema validation
-		const result = await caller.invitation.validate({ 
-			token: "cm123abc456def789ghi012jkl" 
+		const result = await caller.invitation.validate({
+			token: "cm123abc456def789ghi012jkl",
 		});
-		
+
 		expect(result).toEqual({
 			valid: false,
 			reason: "Invitation not found",
@@ -38,7 +42,7 @@ describe("invitation.validate Contract", () => {
 
 		// Invalid CUID format should be rejected by Zod validation
 		await expect(
-			caller.invitation.validate({ token: "invalid_token_123" })
+			caller.invitation.validate({ token: "invalid_token_123" }),
 		).rejects.toThrow();
 	});
 
@@ -68,7 +72,9 @@ describe("invitation.validate Contract", () => {
 		const ctx = await createTRPCContext({ req: null, res: null });
 		const caller = appRouter.createCaller(ctx);
 
-		const result = await caller.invitation.validate({ token: invitation.token });
+		const result = await caller.invitation.validate({
+			token: invitation.token,
+		});
 
 		// Verify response matches contract
 		expect(result).toEqual({
@@ -87,7 +93,7 @@ describe("invitation.validate Contract", () => {
 		const discussion = await db.discussion.create({
 			data: {
 				name: "Test Discussion",
-				description: "Test description", 
+				description: "Test description",
 				isActive: true,
 				creatorId: "test-user-id",
 			},
@@ -107,8 +113,8 @@ describe("invitation.validate Contract", () => {
 		const ctx = await createTRPCContext({ req: null, res: null });
 		const caller = appRouter.createCaller(ctx);
 
-		const result = await caller.invitation.validate({ 
-			token: expiredInvitation.token 
+		const result = await caller.invitation.validate({
+			token: expiredInvitation.token,
 		});
 
 		expect(result).toEqual({
@@ -153,7 +159,9 @@ describe("invitation.validate Contract", () => {
 		const ctx = await createTRPCContext({ req: null, res: null });
 		const caller = appRouter.createCaller(ctx);
 
-		const result = await caller.invitation.validate({ token: invitation.token });
+		const result = await caller.invitation.validate({
+			token: invitation.token,
+		});
 
 		expect(result).toEqual({
 			valid: false,

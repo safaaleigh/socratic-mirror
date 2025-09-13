@@ -16,7 +16,9 @@ export const env = createEnv({
 			.enum(["development", "test", "production"])
 			.default("development"),
 		RESEND_API_KEY: z.string().min(1),
-		AI_PROVIDER: z.enum(["openai", "anthropic", "ollama", "google"]).default("ollama"),
+		AI_PROVIDER: z
+			.enum(["openai", "anthropic", "ollama", "google"])
+			.default("ollama"),
 		AI_MODEL: z.string().default("gpt-oss:20b"),
 		OPENAI_API_KEY: z.string().optional(),
 		ANTHROPIC_API_KEY: z.string().optional(),

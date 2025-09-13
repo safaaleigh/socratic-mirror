@@ -88,32 +88,32 @@ export function MessageList({
 
 	// WebSocket integration for real-time updates
 	const { typingUsers } = useWebSocket({
-			discussionId,
-			onNewMessage: (event: MessageEvent) => {
-				// Invalidate and refetch messages to get the new message
-				void utils.message.list.invalidate({ discussionId });
-			},
-			onMessageEdited: (event: MessageEvent) => {
-				// Invalidate to get the updated message
-				void utils.message.list.invalidate({ discussionId });
-			},
-			onMessageDeleted: (event: MessageEvent) => {
-				// Invalidate to remove the deleted message
-				void utils.message.list.invalidate({ discussionId });
-			},
-			onUserJoined: (user) => {
-				console.log(`${user.name} joined the discussion`);
-			},
-			onUserLeft: (userId) => {
-				console.log(`User ${userId} left the discussion`);
-			},
-			onTypingUpdate: (users) => {
-				console.log("Typing users:", users);
-			},
-			onAIThinking: (isThinking) => {
-				console.log("AI is thinking:", isThinking);
-			},
-		});
+		discussionId,
+		onNewMessage: (event: MessageEvent) => {
+			// Invalidate and refetch messages to get the new message
+			void utils.message.list.invalidate({ discussionId });
+		},
+		onMessageEdited: (event: MessageEvent) => {
+			// Invalidate to get the updated message
+			void utils.message.list.invalidate({ discussionId });
+		},
+		onMessageDeleted: (event: MessageEvent) => {
+			// Invalidate to remove the deleted message
+			void utils.message.list.invalidate({ discussionId });
+		},
+		onUserJoined: (user) => {
+			console.log(`${user.name} joined the discussion`);
+		},
+		onUserLeft: (userId) => {
+			console.log(`User ${userId} left the discussion`);
+		},
+		onTypingUpdate: (users) => {
+			console.log("Typing users:", users);
+		},
+		onAIThinking: (isThinking) => {
+			console.log("AI is thinking:", isThinking);
+		},
+	});
 
 	const reactToMessageMutation = api.message.react.useMutation({
 		onSuccess: () => {
@@ -126,7 +126,6 @@ export function MessageList({
 			void utils.message.list.invalidate({ discussionId });
 		},
 	});
-
 
 	const handleReaction = (
 		messageId: string,
