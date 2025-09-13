@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -27,9 +27,6 @@ import {
 	ThumbsUp,
 	Trash2,
 	User,
-	Users,
-	Wifi,
-	WifiOff,
 } from "lucide-react";
 
 // Define proper types for messages
@@ -90,8 +87,7 @@ export function MessageList({
 	const utils = api.useUtils();
 
 	// WebSocket integration for real-time updates
-	const { isConnected, connectionError, connectedUsers, typingUsers } =
-		useWebSocket({
+	const { typingUsers } = useWebSocket({
 			discussionId,
 			onNewMessage: (event: MessageEvent) => {
 				// Invalidate and refetch messages to get the new message
@@ -131,10 +127,6 @@ export function MessageList({
 		},
 	});
 
-	// Auto-scroll to bottom when new messages arrive
-	useEffect(() => {
-		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-	});
 
 	const handleReaction = (
 		messageId: string,
@@ -223,31 +215,7 @@ export function MessageList({
 
 	return (
 		<div className="space-y-4">
-			{/* Connection status and active users */}
-			<div className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
-				<div className="flex items-center gap-2 text-sm">
-					{isConnected ? (
-						<>
-							<Wifi className="h-4 w-4 text-green-500" />
-							<span className="text-green-600">Connected</span>
-						</>
-					) : (
-						<>
-							<WifiOff className="h-4 w-4 text-red-500" />
-							<span className="text-red-600">
-								{connectionError || "Disconnected"}
-							</span>
-						</>
-					)}
-				</div>
-
-				{connectedUsers.length > 0 && (
-					<div className="flex items-center gap-2 text-muted-foreground text-sm">
-						<Users className="h-4 w-4" />
-						<span>{connectedUsers.length} online</span>
-					</div>
-				)}
-			</div>
+			{/* Connection status temporarily hidden - WebSocket not initialized */}
 
 			{messages.messages.map((message) => (
 				<MessageItem
@@ -308,8 +276,6 @@ function MessageItem({
 	onReply,
 	onEdit,
 	onDelete,
-	isReplying,
-	onCancelReply,
 }: MessageItemProps) {
 	const isAI = message.author?.id === "ai-facilitator";
 	const isCurrentUser = true; // We'll need to get this from session context
