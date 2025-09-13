@@ -5,6 +5,8 @@ import { groupRouter } from "@/server/api/routers/group";
 import { invitationRouter } from "@/server/api/routers/invitation";
 import { lessonRouter } from "@/server/api/routers/lesson";
 import { messageRouter } from "@/server/api/routers/message";
+import { participantRouter } from "@/server/api/routers/participant";
+import { unifiedInvitationRouter } from "@/server/api/routers/unified-invitation";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 
 /**
@@ -19,7 +21,10 @@ export const appRouter = createTRPCRouter({
 	discussion: discussionRouter,
 	invitation: invitationRouter,
 	message: messageRouter,
+	participant: participantRouter,
 	dashboard: dashboardRouter,
+	// Unified invitation system (supports both DB and JWT tokens)
+	unifiedInvitation: unifiedInvitationRouter,
 });
 
 // export type definition of API

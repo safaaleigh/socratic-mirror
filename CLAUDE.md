@@ -13,6 +13,7 @@ This is a T3 Stack application using:
 - Tailwind CSS v4
 - React Query for data fetching
 - Biome for linting/formatting
+- Vercel AI SDK for real-time chat functionality
 
 ## Commands
 
@@ -69,7 +70,7 @@ bun add -d <package>  # Add dev dependency
 
 **Authentication**: NextAuth.js with Discord provider. Sessions are available in tRPC context via `ctx.session`.
 
-**Database Access**: Use the Prisma client instance from `@/server/db`. The schema includes User, Account, Session, Discussion, Group, Lesson, and VerificationToken models.
+**Database Access**: Use the Prisma client instance from `@/server/db`. The schema includes User, Account, Session, Discussion, Group, Lesson, Participant, and VerificationToken models.
 
 **Environment Variables**: Validated using zod in `/src/env.js`. Required vars:
 - `DATABASE_URL` - PostgreSQL connection string
@@ -77,6 +78,8 @@ bun add -d <package>  # Add dev dependency
 - `AUTH_SECRET` - NextAuth secret (required in production)
 
 **Path Aliases**: Use `@/*` to import from `/src/*`
+
+**Real-time Chat**: Uses Vercel AI SDK's `useChat` hook with custom transport for participant messaging. Chat endpoints at `/api/discussion/[id]/chat` compatible with AI SDK streaming protocol.
 
 ## Features
 
@@ -168,15 +171,15 @@ await trpc.lesson.delete.mutate({
 
 ## Recent Changes
 
-### Discussions and Participant Experience (v0.3.0) 🚧 IN PLANNING
-**Branch**: `002-discussions-and-participant`
-- 📋 Create discussions from published lessons
-- 📋 Email and link-based invitation system
-- 📋 Real-time messaging with WebSocket support
-- 📋 AI-facilitated Socratic dialogue
-- 📋 Cohort management and participant tracking
-- 📋 tRPC routers: discussion, invitation, message
-- 📋 Integration with Resend (email) and OpenAI (AI facilitation)
+### Participant View for Discussions (v0.3.0) 🚧 IN DEVELOPMENT
+**Branch**: `003-participant-view-should`
+- 📋 Anonymous participant access via JWT invitation links
+- 📋 Real-time messaging using Vercel AI SDK useChat hook
+- 📋 Participant management (join/leave) without authentication
+- 📋 Message history with lazy loading for performance
+- 📋 tRPC participant router with invitation validation
+- 📋 Server-sent events for participant presence updates
+- 📋 Integration with existing discussion and lesson systems
 
 ### Core Lesson Management System (v0.2.0) ✅ COMPLETED
 **Branch**: `001-core-lesson-management`
@@ -188,3 +191,10 @@ await trpc.lesson.delete.mutate({
 - ✅ Integrated with existing Prisma Lesson model (no schema changes needed)
 - ✅ Business logic for state transitions and ownership validation
 - ✅ Error handling, logging, and user permission enforcement
+
+### Participant Chat Integration
+**Key Components**:
+- `participant` tRPC router - Anonymous participant management
+- `/api/discussion/[id]/chat` - AI SDK streaming endpoint
+- Participant model extends Discussion with anonymous users
+- Message model supports both authenticated users and participants

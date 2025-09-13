@@ -1,0 +1,231 @@
+openapi: 3.0.0
+info:
+  title: Discussion Chat Streaming API  
+  description: Vercel AI SDK compatible endpoint for real-time participant messaging
+  version: 1.0.0
+
+components:
+  schemas:
+    UIMessage:
+      type: object
+      required:
+        - id
+        - role
+        - parts
+      properties:
+        id:
+          type: string
+          description: Unique message identifier
+        role:
+          type: string
+          enum: [user, assistant]
+          description: Message sender role (participants use 'user')
+        parts:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessagePart'
+          description: Message content parts
+        metadata:
+          type: object
+          description: Optional message metadata (timestamps, etc.)
+    
+    MessagePart:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [text]
+          description: Part type (text for participant messages)
+        text:
+          type: string
+          description: Message text content (when type=text)
+    
+    ChatRequest:
+      type: object
+      required:
+        - messages
+        - participantId
+        - discussionId
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/UIMessage'
+          description: Message history + new message (AI SDK format)
+        participantId:
+          type: string
+          description: ID of sending participant
+        discussionId:
+          type: string
+          description: Target discussion ID
+        sessionId:
+          type: string
+          description: Browser session identifier for validation
+    
+    ParticipantPresenceUpdate:
+      type: object
+      required:
+        - type
+        - discussionId
+        - participant
+      properties:
+        type:
+          type: string
+          enum: [participant_joined, participant_left]
+        discussionId:
+          type: string
+        participant:
+          type: object
+          required:
+            - id
+            - displayName
+            - joinedAt
+          properties:
+            id:
+              type: string
+            displayName:
+              type: string
+            joinedAt:
+              type: string
+              format: date-time
+            leftAt:
+              type: string
+              format: date-time
+              nullable: true
+
+paths:
+  /api/discussion/{discussionId}/chat:
+    post:
+      summary: Send message in discussion (AI SDK streaming endpoint)
+      description: |
+        Processes participant message and streams response back to all participants.
+        Compatible with Vercel AI SDK useChat hook.
+        
+        Message Flow:
+        1. Validate participant and discussion access
+        2. Store message in database
+        3. Broadcast message to all participants via streaming
+        4. Return streaming response (AI SDK format)
+      parameters:
+        - name: discussionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Discussion ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Streaming response with message broadcast
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: |
+                  Server-sent events stream in AI SDK format.
+                  Contains message data and participant updates.
+              example: |
+                0:{"type":"message","id":"msg_123","role":"user","parts":[{"type":"text","text":"Hello everyone!"}],"metadata":{"participantId":"part_456","senderName":"Alice","timestamp":"2025-01-09T10:30:00Z"}}
+                d:{"type":"participant_message_broadcast","discussionId":"disc_789","messageId":"msg_123"}
+        '400':
+          description: Invalid request or participant not found
+        '403':
+          description: Discussion closed or participant not authorized
+        '404':
+          description: Discussion not found
+  
+  /api/discussion/{discussionId}/presence:
+    post:
+      summary: Update participant presence (join/leave events)
+      description: |
+        Handles participant presence updates and broadcasts to other participants.
+        Called when participants join or leave discussions.
+      parameters:
+        - name: discussionId
+          in: path  
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipantPresenceUpdate'
+      responses:
+        '200':
+          description: Presence update broadcast successfully
+        '404':
+          description: Discussion not found
+  
+  /api/discussion/{discussionId}/stream:
+    get:
+      summary: Server-sent events stream for real-time updates
+      description: |
+        Establishes SSE connection for receiving real-time discussion updates.
+        Participants connect to receive messages from others and presence updates.
+      parameters:
+        - name: discussionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: participantId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Participant ID for connection validation
+        - name: sessionId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Session ID for validation
+      responses:
+        '200':
+          description: SSE stream established
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Server-sent events containing:
+                  - New messages from other participants
+                  - Participant join/leave notifications  
+                  - Discussion status changes
+              example: |
+                event: message
+                data: {"id":"msg_124","senderName":"Bob","content":"Hi Alice!","timestamp":"2025-01-09T10:31:00Z"}
+                
+                event: participant_joined
+                data: {"participantId":"part_789","displayName":"Charlie","joinedAt":"2025-01-09T10:32:00Z"}
+        '403':
+          description: Invalid participant or session
+        '404':
+          description: Discussion not found
+
+# Integration Notes for Implementation:
+
+# 1. Vercel AI SDK Integration:
+#    - /api/discussion/{discussionId}/chat implements AI SDK streaming protocol
+#    - Request format matches useChat hook expectations
+#    - Response format compatible with AI SDK message streaming
+#    - Custom body fields (participantId, discussionId) passed via AI SDK options
+
+# 2. Real-time Broadcasting:
+#    - Messages stored in DB then broadcast via SSE to all connected participants
+#    - Separate presence channel for join/leave notifications  
+#    - Connection management via participant session validation
+
+# 3. Error Handling:
+#    - Invalid participants rejected at endpoint level
+#    - Closed discussions return 403
+#    - Connection failures handled gracefully with reconnection

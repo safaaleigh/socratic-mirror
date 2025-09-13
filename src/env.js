@@ -22,6 +22,7 @@ export const env = createEnv({
 		ANTHROPIC_API_KEY: z.string().optional(),
 		OLLAMA_BASE_URL: z.string().url().default("http://localhost:11434"),
 		WS_PORT: z.string().optional().default("3002"),
+		JWT_SECRET: z.string().min(32),
 	},
 
 	/**
@@ -48,6 +49,7 @@ export const env = createEnv({
 		ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
 		OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL,
 		WS_PORT: process.env.WS_PORT,
+		JWT_SECRET: process.env.JWT_SECRET,
 	},
 	/**
 	 * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

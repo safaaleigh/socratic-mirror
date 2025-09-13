@@ -109,11 +109,12 @@ model Discussion {
   // Discussion configuration
   isActive    Boolean  @default(true)
   isPublic    Boolean  @default(false)
-  maxParticipants Int  @default(20)
   
   // Access control
   joinCode    String?  @unique @db.VarChar(8)
   password    String?
+  invitationToken String? // JWT token for anonymous participant invitations
+  maxParticipants Int?    // Optional participant limit (null = unlimited)
   
   // Scheduling
   scheduledFor DateTime?
@@ -138,6 +139,7 @@ model Discussion {
   
   // Relations
   participants DiscussionParticipant[]
+  anonymousParticipants Participant[] // New relation for anonymous participants
   messages     Message[]
   
   @@index([creatorId])
@@ -174,6 +176,25 @@ model DiscussionParticipant {
   @@index([discussionId, status])
 }
 
+// Anonymous Participant model for discussions (no user account required)
+model Participant {
+  id           String    @id @default(cuid())
+  discussionId String
+  displayName  String    @db.VarChar(50)
+  joinedAt     DateTime  @default(now())
+  leftAt       DateTime?
+  ipAddress    String?
+  sessionId    String    @db.VarChar(255)
+  
+  // Relations
+  discussion Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  messages   Message[]
+  
+  @@unique([discussionId, sessionId])
+  @@index([discussionId])
+  @@index([sessionId])
+}
+
 // Message model for discussions
 model Message {
   id        String   @id @default(cuid())
@@ -184,6 +205,14 @@ model Message {
   // Author can be null for AI messages
   authorId  String?
   author    User?    @relation("Messages", fields: [authorId], references: [id], onDelete: SetNull)
+  
+  // Anonymous participant author (mutually exclusive with authorId)
+  participantId String?
+  participant   Participant? @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  
+  // Denormalized sender info for performance
+  senderName String   @default("")
+  senderType MessageSenderType @default(USER)
   
   content   String   @db.Text
   type      MessageType @default(USER)
@@ -353,6 +382,12 @@ enum MessageType {
   AI_PROMPT
   SYSTEM
   MODERATOR
+}
+
+enum MessageSenderType {
+  USER
+  PARTICIPANT
+  SYSTEM
 }
 
 enum GroupRole {

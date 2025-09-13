@@ -675,8 +675,11 @@ export const discussionRouter = createTRPCRouter({
 				};
 			}
 
-			// Check capacity
-			if (discussion._count.participants >= discussion.maxParticipants) {
+			// Check capacity (if maxParticipants is set)
+			if (
+				discussion.maxParticipants &&
+				discussion._count.participants >= discussion.maxParticipants
+			) {
 				throw new TRPCError({
 					code: "PRECONDITION_FAILED",
 					message: "Discussion is full",

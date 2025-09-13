@@ -15,9 +15,12 @@ process.env.DATABASE_URL =
 	"postgresql://test:test@localhost:5432/socratic_test";
 process.env.TEST_DATABASE_URL =
 	"postgresql://test:test@localhost:5432/socratic_test";
-process.env.AUTH_SECRET = "test-secret-for-testing";
+process.env.AUTH_SECRET =
+	"test-secret-for-testing-must-be-at-least-32-characters-long";
 process.env.NEXTAUTH_URL = "http://localhost:3000";
-process.env.NEXTAUTH_SECRET = "test-secret-for-testing";
+process.env.NEXTAUTH_SECRET =
+	"test-secret-for-testing-must-be-at-least-32-characters-long";
+process.env.JWT_SECRET = "jwt-test-secret-must-be-at-least-32-characters-long";
 
 // Skip T3 environment validation for tests
 process.env.SKIP_ENV_VALIDATION = "true";

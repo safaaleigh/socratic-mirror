@@ -212,7 +212,7 @@ export default function DiscussionPage({
 									</div>
 
 									<div className="flex items-center gap-2">
-										{!discussion.isActive && isCreator && (
+										{isCreator && (
 											<Button
 												variant="outline"
 												size="sm"

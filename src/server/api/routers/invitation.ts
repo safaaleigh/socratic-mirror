@@ -40,7 +40,7 @@ type DiscussionData = {
 	name: string;
 	description?: string | null;
 	isActive: boolean;
-	maxParticipants: number;
+	maxParticipants: number | null;
 	lesson?: {
 		title: string;
 		description?: string | null;
@@ -219,14 +219,16 @@ export const invitationRouter = createTRPCRouter({
 				input.discussionId,
 			);
 
-			// Check available slots
-			const availableSlots =
-				discussion.maxParticipants - discussion._count.participants;
-			if (input.invitations.length > availableSlots) {
-				throw new TRPCError({
-					code: "PRECONDITION_FAILED",
-					message: `Only ${availableSlots} slots available in this discussion`,
-				});
+			// Check available slots (if maxParticipants is set)
+			if (discussion.maxParticipants) {
+				const availableSlots =
+					discussion.maxParticipants - discussion._count.participants;
+				if (input.invitations.length > availableSlots) {
+					throw new TRPCError({
+						code: "PRECONDITION_FAILED",
+						message: `Only ${availableSlots} slots available in this discussion`,
+					});
+				}
 			}
 
 			const expiresAt = new Date();
@@ -394,7 +396,8 @@ export const invitationRouter = createTRPCRouter({
 				},
 			});
 
-			const url = `${process.env.NEXTAUTH_URL}/invitations/${invitation.token}`;
+			const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+			const url = `${baseUrl}/invitations/${invitation.token}`;
 
 			return {
 				url,
@@ -516,7 +519,7 @@ export const invitationRouter = createTRPCRouter({
 
 			// Check discussion capacity
 			if (
-				discussion &&
+				discussion?.maxParticipants &&
 				discussion._count.participants >= discussion.maxParticipants
 			) {
 				throw new TRPCError({
@@ -889,7 +892,10 @@ export const invitationRouter = createTRPCRouter({
 			}
 
 			const participantCount = discussionInfo._count.participants;
-			if (participantCount >= discussionInfo.maxParticipants) {
+			if (
+				discussionInfo.maxParticipants &&
+				participantCount >= discussionInfo.maxParticipants
+			) {
 				return {
 					valid: false,
 					reason: "Discussion is full",
