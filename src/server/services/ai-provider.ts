@@ -1,5 +1,6 @@
 import { env } from "@/env";
 import { anthropic } from "@ai-sdk/anthropic";
+import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
 import { type LanguageModel, generateObject, generateText } from "ai";
 import { createOllama } from "ollama-ai-provider-v2";
@@ -82,6 +83,17 @@ export class UnifiedAIService {
 					provider: anthropic,
 					model: anthropic(modelName),
 					type: "anthropic" as const,
+				};
+			case "google":
+				if (!env.GOOGLE_GENERATIVE_AI_API_KEY) {
+					throw new Error(
+						"GOOGLE_GENERATIVE_AI_API_KEY is required when using Google provider",
+					);
+				}
+				return {
+					provider: google,
+					model: google(modelName),
+					type: "google" as const,
 				};
 			default:
 				if (!env.OPENAI_API_KEY) {

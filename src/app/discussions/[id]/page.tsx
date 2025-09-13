@@ -293,7 +293,7 @@ export default function DiscussionPage({
 									replyToMessageId={replyToMessageId || undefined}
 									replyToContent={replyToContent || undefined}
 									onSent={() => {
-										// Scroll to bottom of messages
+										// Handle message sent
 									}}
 									onCancelReply={handleCancelReply}
 								/>
