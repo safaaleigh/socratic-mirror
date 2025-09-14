@@ -41,8 +41,12 @@ export function ParticipantChat({
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					messages: [{ role: "user", content: content.trim() }],
-					participantToken: token,
+					messages: [{ 
+						id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+						role: "user", 
+						parts: [{ type: "text", text: content.trim() }] 
+					}],
+					discussionId,
 					participantId,
 					sessionId,
 				}),
