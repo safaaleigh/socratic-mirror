@@ -214,6 +214,50 @@ export const discussionRouter = createTRPCRouter({
 				},
 			});
 
+			// Generate AI facilitator introduction
+			try {
+				const discussionContext = {
+					id: discussion.id,
+					name: discussion.name,
+					description: discussion.description || undefined,
+					lesson: {
+						title: lesson.title,
+						description: lesson.description || undefined,
+						objectives: lesson.objectives,
+						keyQuestions: lesson.keyQuestions,
+						facilitationStyle: lesson.facilitationStyle,
+					},
+					participants: [
+						{
+							id: ctx.session.user.id,
+							name: ctx.session.user.name || "Creator",
+							role: "CREATOR" as ParticipantRole,
+						},
+					],
+					messageCount: 0,
+					duration: "Starting",
+				};
+
+				const aiResponse = await aiService.generateResponse({
+					discussionContext,
+					facilitationGoal: "START_DISCUSSION",
+					specificContext:
+						"This is a new discussion that just started. Welcome participants and introduce the topic.",
+				});
+
+				// Create AI facilitator introduction message
+				await ctx.db.message.create({
+					data: {
+						discussionId: discussion.id,
+						content: aiResponse.content,
+						type: aiResponse.type,
+					},
+				});
+			} catch (error) {
+				console.error("Failed to generate AI introduction:", error);
+				// Continue without AI message if it fails - don't break discussion creation
+			}
+
 			return formatDiscussionOutput(discussion, "CREATOR", ctx.session.user.id);
 		}),
 
