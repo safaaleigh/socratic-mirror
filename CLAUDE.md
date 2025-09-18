@@ -79,7 +79,7 @@ bun add -d <package>  # Add dev dependency
 
 **Path Aliases**: Use `@/*` to import from `/src/*`
 
-**Real-time Chat**: Uses Vercel AI SDK's `useChat` hook with custom transport for participant messaging. Chat endpoints at `/api/discussion/[id]/chat` compatible with AI SDK streaming protocol.
+**Real-time Chat**: Uses Vercel AI SDK's `useChat` hook with custom transport for participant messaging. Chat endpoints at `/api/discussion/[id]/chat-enhanced` compatible with AI SDK streaming protocol.
 
 ## Features
 
@@ -195,6 +195,6 @@ await trpc.lesson.delete.mutate({
 ### Participant Chat Integration
 **Key Components**:
 - `participant` tRPC router - Anonymous participant management
-- `/api/discussion/[id]/chat` - AI SDK streaming endpoint
+- `/api/discussion/[id]/chat-enhanced` - AI SDK streaming endpoint
 - Participant model extends Discussion with anonymous users
 - Message model supports both authenticated users and participants

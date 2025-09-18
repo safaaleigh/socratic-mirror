@@ -1,4 +1,6 @@
 import { env } from "@/env";
+import { db } from "@/server/db";
+import type { Discussion, Lesson, Message } from "@prisma/client";
 import { type FacilitationResponse, unifiedAIService } from "./ai-provider";
 
 export interface DiscussionContext {
@@ -464,6 +466,262 @@ TONE: Encouraging, curious, intellectually rigorous but supportive.
 		if (recentMessageCount >= 3) score += 0.1;
 
 		return Math.min(Math.max(score, 0), 1);
+	}
+
+	/**
+	 * Simple on-demand trigger for admin UI
+	 */
+	static async triggerOnDemandResponse(
+		discussionId: string,
+		options?: {
+			forcePrompt?: boolean;
+			promptType?: "opening" | "continuation" | "custom";
+			customPrompt?: string;
+		},
+	): Promise<{ success: boolean; message?: string; error?: string }> {
+		try {
+			// Get discussion with relations
+			const discussion = await db.discussion.findUnique({
+				where: { id: discussionId, isActive: true },
+				include: {
+					lesson: true,
+					messages: {
+						orderBy: { createdAt: "desc" },
+						take: 10,
+					},
+					_count: {
+						select: {
+							participants: true,
+							anonymousParticipants: true,
+						},
+					},
+				},
+			});
+
+			if (!discussion) {
+				return { success: false, error: "Discussion not found or inactive" };
+			}
+
+			// Generate simple prompt based on discussion state
+			let prompt: string;
+			if (options?.customPrompt) {
+				prompt = options.customPrompt;
+			} else {
+				const type =
+					options?.promptType === "custom" ? undefined : options?.promptType;
+				prompt = this.generateSimplePrompt(discussion, type);
+			}
+
+			if (!prompt) {
+				return {
+					success: false,
+					error: "Could not generate facilitator prompt",
+				};
+			}
+
+			// Create AI facilitator message
+			await db.message.create({
+				data: {
+					discussionId: discussion.id,
+					content: prompt,
+					senderName: "AI Facilitator",
+					senderType: "SYSTEM",
+					type: "AI_QUESTION",
+				},
+			});
+
+			return {
+				success: true,
+				message: `AI facilitator response sent: "${prompt.substring(0, 50)}..."`,
+			};
+		} catch (error) {
+			console.error("AI Facilitator On-Demand Service error:", error);
+			return {
+				success: false,
+				error:
+					error instanceof Error ? error.message : "Unknown error occurred",
+			};
+		}
+	}
+
+	static async checkAndTriggerInactiveDiscussions(): Promise<{
+		discussionsChecked: number;
+		interventionsTriggered: number;
+	}> {
+		// Find active discussions that might need facilitator intervention
+		const activeDiscussions = await db.discussion.findMany({
+			where: {
+				isActive: true,
+				OR: [
+					{ participants: { some: {} } },
+					{ anonymousParticipants: { some: {} } },
+				],
+			},
+			include: {
+				lesson: true,
+				messages: {
+					orderBy: { createdAt: "desc" },
+					take: 10,
+				},
+				_count: {
+					select: {
+						participants: true,
+						anonymousParticipants: true,
+					},
+				},
+			},
+		});
+
+		let interventionsTriggered = 0;
+
+		for (const discussion of activeDiscussions) {
+			try {
+				const shouldIntervene =
+					await this.checkIfInterventionNeeded(discussion);
+				if (shouldIntervene) {
+					const result = await this.triggerOnDemandResponse(discussion.id);
+					if (result.success) {
+						interventionsTriggered++;
+					}
+				}
+			} catch (error) {
+				console.error(`Error processing discussion ${discussion.id}:`, error);
+			}
+		}
+
+		return {
+			discussionsChecked: activeDiscussions.length,
+			interventionsTriggered,
+		};
+	}
+
+	private static async checkIfInterventionNeeded(
+		discussion: any,
+	): Promise<boolean> {
+		const config = this.getFacilitatorConfig(discussion);
+
+		if (!config.enabled) {
+			return false;
+		}
+
+		// Check if discussion has any participants
+		const totalParticipants =
+			discussion._count.participants + discussion._count.anonymousParticipants;
+		if (totalParticipants === 0) {
+			return false;
+		}
+
+		// Get the last message timestamp
+		const lastMessage = discussion.messages[0];
+		if (!lastMessage) {
+			// No messages yet - trigger intervention if discussion is more than 5 minutes old
+			const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+			return discussion.createdAt < fiveMinutesAgo;
+		}
+
+		// Check inactivity threshold
+		const thresholdDate = new Date(
+			Date.now() - config.inactivityThresholdMinutes * 60 * 1000,
+		);
+		const isInactive = lastMessage.createdAt < thresholdDate;
+
+		if (!isInactive) {
+			return false;
+		}
+
+		// Check if we should throttle prompts
+		return !(await this.shouldThrottlePrompts(discussion, config));
+	}
+
+	private static getFacilitatorConfig(discussion: any) {
+		const defaultConfig = {
+			enabled: true,
+			inactivityThresholdMinutes: 10,
+			maxPrompts: 3,
+			promptInterval: 30,
+			facilitationStyle: discussion.lesson?.facilitationStyle || "exploratory",
+		};
+
+		try {
+			const aiConfig = discussion.aiConfig as any;
+			return {
+				...defaultConfig,
+				...aiConfig?.facilitator,
+			};
+		} catch {
+			return defaultConfig;
+		}
+	}
+
+	private static async shouldThrottlePrompts(
+		discussion: any,
+		config: any,
+	): Promise<boolean> {
+		// Check if we've already sent too many AI prompts recently
+		const recentAIMessages = discussion.messages.filter(
+			(msg: any) =>
+				msg.senderType === "SYSTEM" &&
+				(msg.type === "AI_QUESTION" || msg.type === "AI_PROMPT") &&
+				msg.createdAt >
+					new Date(Date.now() - config.promptInterval * 60 * 1000),
+		);
+
+		return recentAIMessages.length >= config.maxPrompts;
+	}
+
+	private static generateSimplePrompt(
+		discussion: any,
+		promptType?: "opening" | "continuation",
+	): string {
+		const messageCount = discussion.messages.length;
+		const hasLesson = !!discussion.lesson;
+
+		if (!promptType) {
+			promptType = messageCount === 0 ? "opening" : "continuation";
+		}
+
+		if (promptType === "opening") {
+			if (hasLesson && discussion.lesson.keyQuestions?.length) {
+				const questions = discussion.lesson.keyQuestions;
+				const randomQuestion =
+					questions[Math.floor(Math.random() * questions.length)];
+				return `Welcome to "${discussion.name}"! Let's begin by exploring: ${randomQuestion}`;
+			}
+			return `Welcome to "${discussion.name}"! What brings you to this discussion today?`;
+		} else {
+			// Continuation prompts
+			const facilitationStyle =
+				discussion.lesson?.facilitationStyle || "exploratory";
+
+			if (facilitationStyle === "analytical") {
+				const prompts = [
+					"What evidence supports the points we've discussed?",
+					"Can we identify the underlying assumptions in our reasoning?",
+					"What are the strongest and weakest aspects of the arguments presented?",
+				];
+				return (
+					prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0]
+				);
+			} else if (facilitationStyle === "ethical") {
+				const prompts = [
+					"What ethical considerations are at stake in this discussion?",
+					"Who might be affected by the ideas we're exploring?",
+					"What values seem to be in tension here?",
+				];
+				return (
+					prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0]
+				);
+			} else {
+				const prompts = [
+					"What new perspectives have emerged from our conversation so far?",
+					"What questions are arising for you as we discuss this?",
+					"How might someone with a different background view this issue?",
+				];
+				return (
+					prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0]
+				);
+			}
+		}
 	}
 }
 

@@ -7,7 +7,7 @@ import {
 } from "../db-setup";
 
 /**
- * Contract tests for POST /api/discussion/[id]/chat endpoint
+ * Contract tests for POST /api/discussion/[id]/chat-enhanced endpoint
  *
  * This endpoint is compatible with Vercel AI SDK useChat hook and implements
  * the streaming protocol for real-time participant messaging.
@@ -15,7 +15,7 @@ import {
  * These tests MUST FAIL initially since the endpoint doesn't exist yet.
  * They define the expected API contract for the participant view feature.
  */
-describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
+describe("POST /api/discussion/[id]/chat-enhanced - Contract Tests", () => {
 	let testUser: Awaited<ReturnType<typeof createTestUser>>;
 	let testLesson: Awaited<ReturnType<typeof createTestLesson>>;
 	let discussion: { id: string };
@@ -91,7 +91,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 			};
 
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "POST",
 					headers: {
@@ -137,7 +137,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 			};
 
 			const response = await fetch(
-				`${baseUrl}/api/discussion/invalid-discussion-id/chat`,
+				`${baseUrl}/api/discussion/invalid-discussion-id/chat-enhanced`,
 				{
 					method: "POST",
 					headers: {
@@ -166,7 +166,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 			};
 
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "POST",
 					headers: {
@@ -195,7 +195,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 			};
 
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "POST",
 					headers: {
@@ -230,7 +230,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 			};
 
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "POST",
 					headers: {
@@ -261,7 +261,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 			};
 
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "POST",
 					headers: {
@@ -291,7 +291,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 			};
 
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "POST",
 					headers: {
@@ -321,7 +321,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 			};
 
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "POST",
 					headers: {
@@ -350,7 +350,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 			};
 
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "POST",
 					headers: {
@@ -379,7 +379,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 			};
 
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "POST",
 					headers: {
@@ -417,7 +417,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 			};
 
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "POST",
 					headers: {
@@ -489,7 +489,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 			};
 
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "POST",
 					headers: {
@@ -507,7 +507,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 	describe("HTTP Methods Contract", () => {
 		it("should reject GET requests", async () => {
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "GET",
 				},
@@ -519,7 +519,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 
 		it("should reject PUT requests", async () => {
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "PUT",
 					headers: {
@@ -535,7 +535,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 
 		it("should reject DELETE requests", async () => {
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "DELETE",
 				},
@@ -562,7 +562,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 			};
 
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "POST",
 					// No Content-Type header
@@ -576,7 +576,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 
 		it("should reject requests with wrong Content-Type", async () => {
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "POST",
 					headers: {
@@ -592,7 +592,7 @@ describe("POST /api/discussion/[id]/chat - Contract Tests", () => {
 
 		it("should reject malformed JSON", async () => {
 			const response = await fetch(
-				`${baseUrl}/api/discussion/${discussion.id}/chat`,
+				`${baseUrl}/api/discussion/${discussion.id}/chat-enhanced`,
 				{
 					method: "POST",
 					headers: {

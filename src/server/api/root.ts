@@ -1,3 +1,4 @@
+import { aiFacilitatorRouter } from "@/server/api/routers/ai-facilitator";
 import { authRouter } from "@/server/api/routers/auth";
 import { dashboardRouter } from "@/server/api/routers/dashboard";
 import { discussionRouter } from "@/server/api/routers/discussion";
@@ -25,6 +26,8 @@ export const appRouter = createTRPCRouter({
 	dashboard: dashboardRouter,
 	// Unified invitation system (supports both DB and JWT tokens)
 	unifiedInvitation: unifiedInvitationRouter,
+	// AI Facilitator system
+	aiFacilitator: aiFacilitatorRouter,
 });
 
 // export type definition of API

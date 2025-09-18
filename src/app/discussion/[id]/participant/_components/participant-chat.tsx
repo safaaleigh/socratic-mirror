@@ -35,24 +35,27 @@ export function ParticipantChat({
 		setError(null);
 
 		try {
-			const response = await fetch(`/api/discussion/${discussionId}/chat`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
+			const response = await fetch(
+				`/api/discussion/${discussionId}/chat-enhanced`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						messages: [
+							{
+								id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+								role: "user",
+								parts: [{ type: "text", text: content.trim() }],
+							},
+						],
+						discussionId,
+						participantId,
+						sessionId,
+					}),
 				},
-				body: JSON.stringify({
-					messages: [
-						{
-							id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-							role: "user",
-							parts: [{ type: "text", text: content.trim() }],
-						},
-					],
-					discussionId,
-					participantId,
-					sessionId,
-				}),
-			});
+			);
 
 			if (!response.ok) {
 				const errorData = await response.json().catch(() => ({}));

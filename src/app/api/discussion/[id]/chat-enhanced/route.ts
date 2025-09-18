@@ -1,17 +1,18 @@
 /**
- * Vercel AI SDK Compatible Chat API Endpoint
+ * Enhanced Vercel AI SDK Compatible Chat API Endpoint
  *
- * POST /api/discussion/[id]/chat
- *
- * This endpoint provides AI SDK useChat hook compatible streaming responses for participant messaging.
- * Supports both authenticated users and anonymous participants via JWT tokens.
+ * This endpoint provides full AI SDK useChat hook compatibility with:
+ * - Proper streaming protocol support
+ * - Message metadata
+ * - Error handling
+ * - Multi-participant WebSocket broadcasting
  */
 
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { getWebSocketService } from "@/server/services/websocket";
 import type { MessageSenderType } from "@prisma/client";
-import { type NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { z } from "zod";
 
 // ==================== Types & Schemas ====================
@@ -27,13 +28,7 @@ const chatRequestSchema = z.object({
 					text: z.string(),
 				}),
 			),
-			metadata: z
-				.object({
-					participantId: z.string().optional(),
-					senderName: z.string().optional(),
-					timestamp: z.string().optional(),
-				})
-				.optional(),
+			metadata: z.any().optional(),
 		}),
 	),
 	// Direct fields for participant authentication
@@ -44,10 +39,6 @@ const chatRequestSchema = z.object({
 
 // ==================== Helper Functions ====================
 
-/**
- * Authenticate participant using session validation
- * For contract tests, we allow anonymous participants with valid session IDs
- */
 async function authenticateParticipant(
 	discussionId: string,
 	participantId: string,
@@ -62,7 +53,6 @@ async function authenticateParticipant(
 	// Try session authentication first (for logged-in users)
 	const session = await auth();
 	if (session?.user) {
-		// Verify user is a participant in this discussion
 		const participant = await db.discussionParticipant.findFirst({
 			where: {
 				discussionId,
@@ -88,7 +78,6 @@ async function authenticateParticipant(
 
 	// Try anonymous participant lookup
 	if (participantId && sessionId) {
-		// Check if participant exists in database
 		const participant = await db.participant.findUnique({
 			where: { id: participantId },
 		});
@@ -98,7 +87,7 @@ async function authenticateParticipant(
 			participant.discussionId === discussionId &&
 			!participant.leftAt
 		) {
-			// Validate session ID matches (simple session validation)
+			// Validate session ID matches
 			if (participant.sessionId === sessionId) {
 				return {
 					type: "participant",
@@ -106,10 +95,8 @@ async function authenticateParticipant(
 					displayName: participant.displayName,
 					senderType: "PARTICIPANT",
 				};
-			} else {
-				// Session ID mismatch - this is a security issue
-				throw new Error("Session mismatch");
 			}
+			throw new Error("Session mismatch");
 		}
 
 		// For testing: create anonymous participant if doesn't exist
@@ -132,7 +119,6 @@ async function authenticateParticipant(
 			};
 		}
 
-		// If we get here with a participant ID, it's invalid format
 		if (!participant) {
 			throw new Error("Invalid participant ID");
 		}
@@ -141,9 +127,6 @@ async function authenticateParticipant(
 	throw new Error("Authentication required");
 }
 
-/**
- * Verify discussion is active and accessible
- */
 async function verifyDiscussion(discussionId: string): Promise<void> {
 	const discussion = await db.discussion.findUnique({
 		where: { id: discussionId },
@@ -162,9 +145,6 @@ async function verifyDiscussion(discussionId: string): Promise<void> {
 	}
 }
 
-/**
- * Create message in database and broadcast to participants
- */
 async function createMessage(
 	discussionId: string,
 	content: string,
@@ -192,14 +172,6 @@ async function createMessage(
 			senderName: auth.displayName,
 			senderType: auth.senderType,
 			type: "USER",
-		},
-		include: {
-			author: {
-				select: { name: true },
-			},
-			participant: {
-				select: { displayName: true },
-			},
 		},
 	});
 
@@ -330,26 +302,32 @@ export async function POST(
 	context: { params: Promise<{ id: string }> },
 ) {
 	const params = await context.params;
-	try {
-		const discussionId = params.id;
+	const discussionId = params.id;
 
-		// Validate Content-Type header
+	try {
+		// Validate Content-Type
 		const contentType = request.headers.get("Content-Type");
-		if (!contentType || !contentType.includes("application/json")) {
-			return NextResponse.json(
-				{ error: "Content-Type must be application/json" },
-				{ status: 400 },
+		if (!contentType?.includes("application/json")) {
+			return new Response(
+				JSON.stringify({ error: "Content-Type must be application/json" }),
+				{
+					status: 400,
+					headers: { "Content-Type": "application/json" },
+				},
 			);
 		}
 
-		// Validate request body (with JSON parsing error handling)
+		// Parse request body
 		let body: unknown;
 		try {
 			body = await request.json();
 		} catch {
-			return NextResponse.json(
-				{ error: "Invalid JSON in request body" },
-				{ status: 400 },
+			return new Response(
+				JSON.stringify({ error: "Invalid JSON in request body" }),
+				{
+					status: 400,
+					headers: { "Content-Type": "application/json" },
+				},
 			);
 		}
 
@@ -362,30 +340,38 @@ export async function POST(
 
 		// Verify discussion ID matches
 		if (requestDiscussionId !== discussionId) {
-			return NextResponse.json(
-				{ error: "Discussion ID mismatch" },
-				{ status: 400 },
-			);
+			return new Response(JSON.stringify({ error: "Discussion ID mismatch" }), {
+				status: 400,
+				headers: { "Content-Type": "application/json" },
+			});
 		}
 
 		// Verify discussion is active
 		await verifyDiscussion(discussionId);
 
-		// Get the last user message (what the participant just sent)
+		// Get the last user message
 		const lastMessage = messages.filter((m) => m.role === "user").pop();
 		if (!lastMessage?.parts?.[0]?.text?.trim()) {
-			return NextResponse.json(
-				{ error: "Message content is required" },
-				{ status: 400 },
+			return new Response(
+				JSON.stringify({ error: "Message content is required" }),
+				{
+					status: 400,
+					headers: { "Content-Type": "application/json" },
+				},
 			);
 		}
 
-		// Validate message length (5000 character limit)
+		// Validate message length
 		const messageText = lastMessage.parts[0].text.trim();
 		if (messageText.length > 5000) {
-			return NextResponse.json(
-				{ error: "Message content exceeds 5000 character limit" },
-				{ status: 400 },
+			return new Response(
+				JSON.stringify({
+					error: "Message content exceeds 5000 character limit",
+				}),
+				{
+					status: 400,
+					headers: { "Content-Type": "application/json" },
+				},
 			);
 		}
 
@@ -408,12 +394,18 @@ export async function POST(
 			discussionId,
 		);
 	} catch (error) {
-		console.error("Chat API error:", error);
+		console.error("Enhanced Chat API error:", error);
 
 		if (error instanceof z.ZodError) {
-			return NextResponse.json(
-				{ error: "Invalid request data", details: error.errors },
-				{ status: 400 },
+			return new Response(
+				JSON.stringify({
+					error: "Invalid request data",
+					details: error.errors,
+				}),
+				{
+					status: 400,
+					headers: { "Content-Type": "application/json" },
+				},
 			);
 		}
 
@@ -430,16 +422,16 @@ export async function POST(
 								? 401
 								: 500;
 
-			return NextResponse.json(
-				{ error: error.message },
-				{ status: statusCode },
-			);
+			return new Response(JSON.stringify({ error: error.message }), {
+				status: statusCode,
+				headers: { "Content-Type": "application/json" },
+			});
 		}
 
-		return NextResponse.json(
-			{ error: "Internal server error" },
-			{ status: 500 },
-		);
+		return new Response(JSON.stringify({ error: "Internal server error" }), {
+			status: 500,
+			headers: { "Content-Type": "application/json" },
+		});
 	}
 }
 

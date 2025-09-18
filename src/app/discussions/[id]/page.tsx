@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { notFound, redirect } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { AuthenticatedChatContainer } from "@/components/chat";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -24,8 +25,6 @@ import {
 	Users,
 } from "lucide-react";
 import { InviteParticipantsModal } from "../_components/invite-participants-modal";
-import { MessageInput } from "./_components/message-input";
-import { MessageList } from "./_components/message-list";
 
 export default function DiscussionPage({
 	params,
@@ -42,8 +41,6 @@ export default function DiscussionPage({
 	}, [params]);
 	const { data: session, status } = useSession();
 	const [inviteModalOpen, setInviteModalOpen] = useState(false);
-	const [replyToMessageId, setReplyToMessageId] = useState<string | null>(null);
-	const [replyToContent, setReplyToContent] = useState<string | null>(null);
 
 	const {
 		data: discussion,
@@ -88,6 +85,16 @@ export default function DiscussionPage({
 					id: paramsResolved.id,
 				});
 			}
+		},
+	});
+
+	const aiFacilitatorMutation = api.aiFacilitator.triggerResponse.useMutation({
+		onSuccess: (data) => {
+			console.log("AI Facilitator triggered successfully:", data.message);
+		},
+		onError: (error) => {
+			console.error("AI Facilitator error:", error.message);
+			alert(`AI Facilitator Error: ${error.message}`);
 		},
 	});
 
@@ -153,14 +160,13 @@ export default function DiscussionPage({
 		}
 	};
 
-	const handleReplyToMessage = (messageId: string, content: string) => {
-		setReplyToMessageId(messageId);
-		setReplyToContent(content);
-	};
-
-	const handleCancelReply = () => {
-		setReplyToMessageId(null);
-		setReplyToContent(null);
+	const handleTriggerAIFacilitator = () => {
+		if (paramsResolved?.id) {
+			aiFacilitatorMutation.mutate({
+				discussionId: paramsResolved.id,
+				forcePrompt: true,
+			});
+		}
 	};
 
 	return (
@@ -172,7 +178,7 @@ export default function DiscussionPage({
 						{/* Discussion Header */}
 						<Card className="mb-4">
 							<CardHeader>
-								<div className="flex items-start justify-between">
+								<div className="flex items-start justify-between gap-4">
 									<div className="min-w-0 flex-1">
 										<div className="mb-2 flex items-center gap-3">
 											<Button
@@ -182,7 +188,7 @@ export default function DiscussionPage({
 											>
 												<ArrowLeft className="h-4 w-4" />
 											</Button>
-											<div>
+											<div className="min-w-0 max-w-md flex-1 overflow-hidden">
 												<h1 className="truncate font-bold text-xl">
 													{discussion.name}
 												</h1>
@@ -211,16 +217,30 @@ export default function DiscussionPage({
 										)}
 									</div>
 
-									<div className="flex items-center gap-2">
+									<div className="flex shrink-0 items-center gap-2">
 										{isCreator && (
-											<Button
-												variant="outline"
-												size="sm"
-												onClick={() => setInviteModalOpen(true)}
-											>
-												<UserPlus className="mr-2 h-4 w-4" />
-												Invite
-											</Button>
+											<>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => setInviteModalOpen(true)}
+												>
+													<UserPlus className="mr-2 h-4 w-4" />
+													Invite
+												</Button>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => handleTriggerAIFacilitator()}
+													disabled={aiFacilitatorMutation.isPending}
+												>
+													{aiFacilitatorMutation.isPending ? (
+														"🤖 Sending..."
+													) : (
+														<>🤖 AI Facilitator</>
+													)}
+												</Button>
+											</>
 										)}
 
 										{canJoin && (
@@ -261,13 +281,15 @@ export default function DiscussionPage({
 
 						{/* Messages Area */}
 						<div className="flex flex-1 flex-col overflow-hidden">
-							<div className="flex-1 space-y-4 overflow-y-auto p-4">
-								{isParticipant ? (
-									<MessageList
-										discussionId={paramsResolved?.id ?? ""}
-										onReplyToMessage={handleReplyToMessage}
-									/>
-								) : (
+							{isParticipant ? (
+								<AuthenticatedChatContainer
+									discussionId={paramsResolved?.id ?? ""}
+									userId={session?.user?.id ?? ""}
+									displayName={session?.user?.name ?? "User"}
+									className="h-full"
+								/>
+							) : (
+								<div className="flex flex-1 items-center justify-center p-4">
 									<Card>
 										<CardContent className="py-12 text-center">
 											<Eye className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
@@ -283,20 +305,7 @@ export default function DiscussionPage({
 											)}
 										</CardContent>
 									</Card>
-								)}
-							</div>
-
-							{/* Message Input */}
-							{isParticipant && (
-								<MessageInput
-									discussionId={paramsResolved?.id ?? ""}
-									replyToMessageId={replyToMessageId || undefined}
-									replyToContent={replyToContent || undefined}
-									onSent={() => {
-										// Handle message sent
-									}}
-									onCancelReply={handleCancelReply}
-								/>
+								</div>
 							)}
 						</div>
 					</div>

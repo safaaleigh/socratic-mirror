@@ -17,9 +17,8 @@ import {
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { ChatContainer } from "@/components/chat";
 import { ConnectionStatus } from "./_components/connection-status";
-import { MessageHistory } from "./_components/message-history";
-import { ParticipantChat } from "./_components/participant-chat";
 import { ParticipantList } from "./_components/participant-list";
 
 type ParticipantData = {
@@ -28,14 +27,6 @@ type ParticipantData = {
 	displayName: string;
 	joinedAt: string;
 	leftAt: string | null;
-};
-
-type MessageHistoryData = {
-	id: string;
-	content: string;
-	senderName: string;
-	senderType: "user" | "participant" | "system";
-	createdAt: string;
 };
 
 export default function ParticipantDiscussionPage() {
@@ -52,9 +43,6 @@ export default function ParticipantDiscussionPage() {
 	const [sessionId, setSessionId] = useState("");
 	const [isJoining, setIsJoining] = useState(false);
 	const [joinError, setJoinError] = useState<string | null>(null);
-	const [messageHistory, setMessageHistory] = useState<MessageHistoryData[]>(
-		[],
-	);
 
 	// Generate session ID on mount
 	useEffect(() => {
@@ -99,7 +87,6 @@ export default function ParticipantDiscussionPage() {
 	const joinDiscussionMutation = api.participant.join.useMutation({
 		onSuccess: (data) => {
 			setParticipantId(data.participant.id);
-			setMessageHistory(data.messageHistory);
 			setJoinError(null);
 
 			// Store participant info in localStorage
@@ -145,7 +132,6 @@ export default function ParticipantDiscussionPage() {
 			localStorage.removeItem(`participant_${discussionId}`);
 			localStorage.removeItem(`displayName_${discussionId}`);
 			setParticipantId(null);
-			setMessageHistory([]);
 		}
 	};
 
@@ -341,24 +327,13 @@ export default function ParticipantDiscussionPage() {
 
 					{/* Chat Area */}
 					<div className="flex min-h-0 flex-col lg:col-span-2">
-						<div className="mb-4 min-h-0 flex-1">
-							<MessageHistory
-								discussionId={discussionId}
-								participantId={participantId}
-								token={token || ""}
-								initialMessages={messageHistory}
-							/>
-						</div>
-
-						<div className="flex-shrink-0">
-							<ParticipantChat
-								discussionId={discussionId}
-								participantId={participantId}
-								displayName={displayName}
-								sessionId={sessionId}
-								token={token || ""}
-							/>
-						</div>
+						<ChatContainer
+							discussionId={discussionId}
+							participantId={participantId}
+							sessionId={sessionId}
+							displayName={displayName}
+							className="h-full"
+						/>
 					</div>
 
 					{/* Mobile Participant List - Show on mobile, hide on large screens */}
