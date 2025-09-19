@@ -205,15 +205,6 @@ function DiscussionActions({
 }) {
 	return (
 		<div className="flex items-center gap-1">
-			<Button
-				variant="ghost"
-				size="icon"
-				onClick={() => onView?.(discussion.id)}
-				title="View discussion"
-			>
-				<Eye className="h-4 w-4" />
-			</Button>
-
 			{!discussion.isActive && (
 				<Button
 					variant="ghost"
@@ -229,6 +220,7 @@ function DiscussionActions({
 				<Button
 					variant="ghost"
 					size="icon"
+					className="cursor-pointer"
 					onClick={() => onManage?.(discussion.id)}
 					title="Manage discussion"
 				>

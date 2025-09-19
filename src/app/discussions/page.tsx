@@ -74,13 +74,6 @@ export default function DiscussionsPage() {
 	return (
 		<>
 			<DashboardLayout breadcrumbItems={breadcrumbItems}>
-				<div className="mb-8">
-					<h1 className="font-bold text-3xl">Discussion Management</h1>
-					<p className="mt-2 text-muted-foreground">
-						Create and manage AI-facilitated Socratic discussions based on your
-						lessons.
-					</p>
-				</div>
 
 				<div className="grid gap-6">
 					{viewMode === "list" && (
@@ -152,23 +145,6 @@ export default function DiscussionsPage() {
 								</div>
 							</div>
 
-							{/* Tips */}
-							<div className="rounded-lg border-blue-500 border-l-4 bg-blue-50 p-4 dark:bg-blue-950/30">
-								<h3 className="mb-2 flex items-center gap-2 font-medium text-blue-800 text-sm dark:text-blue-200">
-									<MessageCircle className="h-4 w-4" />
-									Tips for Great Discussions
-								</h3>
-								<ul className="space-y-1 text-blue-700 text-xs dark:text-blue-300">
-									<li>
-										• Start with a clear, engaging question from your lesson
-									</li>
-									<li>• Invite 4-8 participants for optimal engagement</li>
-									<li>• Let the AI facilitator guide the Socratic method</li>
-									<li>
-										• Encourage participants to build on each other's ideas
-									</li>
-								</ul>
-							</div>
 						</>
 					)}
 
