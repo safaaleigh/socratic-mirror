@@ -703,7 +703,7 @@ TONE: Encouraging, curious, intellectually rigorous but supportive.
 				"Can we identify the underlying assumptions in our reasoning?",
 				"What are the strongest and weakest aspects of the arguments presented?",
 			];
-			return prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0];
+			return prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0]!;
 		}
 		if (facilitationStyle === "ethical") {
 			const prompts = [
@@ -711,14 +711,14 @@ TONE: Encouraging, curious, intellectually rigorous but supportive.
 				"Who might be affected by the ideas we're exploring?",
 				"What values seem to be in tension here?",
 			];
-			return prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0];
+			return prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0]!;
 		}
 		const prompts = [
 			"What new perspectives have emerged from our conversation so far?",
 			"What questions are arising for you as we discuss this?",
 			"How might someone with a different background view this issue?",
 		];
-		return prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0];
+		return prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0]!;
 	}
 }
 

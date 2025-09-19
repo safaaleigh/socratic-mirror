@@ -4,6 +4,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { UIMessage } from "ai";
 
+interface MessageMetadata {
+	senderName?: string;
+	timestamp?: string;
+	senderType?: string;
+	type?: string;
+}
+
 interface MessageItemProps {
 	message: UIMessage;
 	displayName?: string;
@@ -22,11 +29,12 @@ export function MessageItem({
 		.join("");
 
 	// Get metadata
-	const senderName = message.metadata?.senderName || displayName || "Anonymous";
-	const senderType = message.metadata?.senderType || "USER";
-	const messageType = message.metadata?.type || "USER";
-	const timestamp = message.metadata?.timestamp
-		? new Date(message.metadata.timestamp).toLocaleTimeString([], {
+	const metadata = message.metadata as MessageMetadata | undefined;
+	const senderName = metadata?.senderName || displayName || "Anonymous";
+	const senderType = metadata?.senderType || "USER";
+	const messageType = metadata?.type || "USER";
+	const timestamp = metadata?.timestamp
+		? new Date(metadata.timestamp).toLocaleTimeString([], {
 				hour: "2-digit",
 				minute: "2-digit",
 			})

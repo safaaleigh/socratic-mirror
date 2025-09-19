@@ -6,6 +6,12 @@ import type { UIMessage } from "ai";
 import { useEffect, useRef } from "react";
 import { MessageItem } from "./MessageItem";
 
+interface MessageMetadata {
+	userId?: string;
+	participantId?: string;
+	senderName?: string;
+}
+
 interface MessageListProps {
 	messages: UIMessage[];
 	currentUserId?: string;
@@ -34,14 +40,15 @@ export function MessageList({
 
 	// Determine if a message is from the current user
 	const isCurrentUserMessage = (message: UIMessage) => {
+		const metadata = message.metadata as MessageMetadata | undefined;
 		// For authenticated users
-		if (currentUserId && message.metadata?.userId === currentUserId) {
+		if (currentUserId && metadata?.userId === currentUserId) {
 			return true;
 		}
 		// For participants
 		if (
 			currentParticipantId &&
-			message.metadata?.participantId === currentParticipantId
+			metadata?.participantId === currentParticipantId
 		) {
 			return true;
 		}

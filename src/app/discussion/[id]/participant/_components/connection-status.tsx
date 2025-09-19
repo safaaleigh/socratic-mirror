@@ -139,10 +139,13 @@ export function ConnectionStatus({
 
 			eventSource.onmessage = (event) => {
 				// Connection is working if we receive messages
-				if (connectionState !== "connected") {
-					setConnectionState("connected");
-					setLastConnected(new Date());
-				}
+				setConnectionState((current) => {
+					if (current !== "connected") {
+						setLastConnected(new Date());
+						return "connected";
+					}
+					return current;
+				});
 			};
 
 			eventSource.onerror = (error) => {

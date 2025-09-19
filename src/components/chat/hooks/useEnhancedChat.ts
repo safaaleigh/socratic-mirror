@@ -5,6 +5,13 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+interface MessageMetadata {
+	senderName?: string;
+	timestamp?: string;
+	senderType?: string;
+	createdAt?: string;
+}
+
 interface UseEnhancedChatProps {
 	discussionId: string;
 	participantId: string;
@@ -175,10 +182,11 @@ export function useEnhancedChat({
 
 	const getMessageMetadata = useCallback(
 		(message: UIMessage) => {
+			const metadata = message.metadata as MessageMetadata | undefined;
 			return {
-				senderName: message.metadata?.senderName || displayName,
-				timestamp: message.metadata?.timestamp || new Date().toISOString(),
-				senderType: message.metadata?.senderType || "participant",
+				senderName: metadata?.senderName || displayName,
+				timestamp: metadata?.timestamp || new Date().toISOString(),
+				senderType: metadata?.senderType || "participant",
 			};
 		},
 		[displayName],
