@@ -1,6 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
+import { useMemo } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,12 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/trpc/react";
 import {
@@ -19,6 +26,7 @@ import {
 	Clock,
 	Eye,
 	MessageCircle,
+	MoreHorizontal,
 	Settings,
 	UserPlus,
 	Users,
@@ -40,10 +48,14 @@ type DiscussionData = {
 };
 
 export function DiscussionList({
+	searchQuery = "",
+	statusFilter = "all",
 	onViewDiscussion,
 	onInviteParticipants,
 	onManageDiscussion,
 }: {
+	searchQuery?: string;
+	statusFilter?: string;
 	onViewDiscussion?: (discussionId: string) => void;
 	onInviteParticipants?: (discussionId: string) => void;
 	onManageDiscussion?: (discussionId: string) => void;
@@ -54,29 +66,58 @@ export function DiscussionList({
 		error,
 	} = api.discussion.list.useQuery({});
 
+	const filteredDiscussions = useMemo(() => {
+		if (!discussions?.discussions) return [];
+
+		let filtered = discussions.discussions;
+
+		// Filter by search query
+		if (searchQuery.trim()) {
+			const query = searchQuery.toLowerCase();
+			filtered = filtered.filter(
+				(discussion) =>
+					discussion.name.toLowerCase().includes(query) ||
+					discussion.description?.toLowerCase().includes(query) ||
+					discussion.lesson?.title.toLowerCase().includes(query),
+			);
+		}
+
+		// Filter by status
+		if (statusFilter !== "all") {
+			filtered = filtered.filter((discussion) => {
+				if (statusFilter === "active") return discussion.isActive;
+				if (statusFilter === "inactive") return !discussion.isActive;
+				return true;
+			});
+		}
+
+		return filtered;
+	}, [discussions?.discussions, searchQuery, statusFilter]);
+
 	if (isLoading) {
 		return (
-			<Card>
-				<CardContent className="p-6">
-					<div className="space-y-4">
-						<div key="discussion-skeleton-1" className="space-y-2">
-							<Skeleton className="h-4 w-3/4" />
-							<Skeleton className="h-3 w-1/2" />
-							<Skeleton className="h-3 w-1/4" />
-						</div>
-						<div key="discussion-skeleton-2" className="space-y-2">
-							<Skeleton className="h-4 w-3/4" />
-							<Skeleton className="h-3 w-1/2" />
-							<Skeleton className="h-3 w-1/4" />
-						</div>
-						<div key="discussion-skeleton-3" className="space-y-2">
-							<Skeleton className="h-4 w-3/4" />
-							<Skeleton className="h-3 w-1/2" />
-							<Skeleton className="h-3 w-1/4" />
-						</div>
-					</div>
-				</CardContent>
-			</Card>
+			<div className="space-y-4">
+				{Array.from({ length: 3 }).map((_, i) => (
+					<Card key={`skeleton-${i}`}>
+						<CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
+							<div className="flex-1 space-y-2">
+								<Skeleton className="h-5 w-3/4" />
+								<Skeleton className="h-4 w-1/2" />
+							</div>
+							<div className="flex items-center gap-2">
+								<Skeleton className="h-5 w-16" />
+								<Skeleton className="h-8 w-8 rounded-md" />
+							</div>
+						</CardHeader>
+						<CardContent className="pt-0">
+							<div className="space-y-2">
+								<Skeleton className="h-3 w-full" />
+								<Skeleton className="h-3 w-2/3" />
+							</div>
+						</CardContent>
+					</Card>
+				))}
+			</div>
 		);
 	}
 
@@ -92,13 +133,31 @@ export function DiscussionList({
 
 	if (!discussions || discussions.discussions.length === 0) {
 		return (
-			<Card>
-				<CardContent className="py-12 text-center">
-					<MessageCircle className="mx-auto h-12 w-12 text-muted-foreground" />
-					<CardTitle className="mt-4">No discussions yet</CardTitle>
-					<CardDescription className="mx-auto mt-2 max-w-sm">
+			<Card className="border-dashed">
+				<CardContent className="py-16 text-center">
+					<div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+						<MessageCircle className="h-10 w-10 text-muted-foreground" />
+					</div>
+					<CardTitle className="mt-6 text-xl">No discussions yet</CardTitle>
+					<CardDescription className="mx-auto mt-2 max-w-md text-balance">
 						Create your first discussion from a published lesson to start
-						facilitating AI-guided conversations.
+						facilitating AI-guided Socratic conversations with participants.
+					</CardDescription>
+				</CardContent>
+			</Card>
+		);
+	}
+
+	if (filteredDiscussions.length === 0) {
+		return (
+			<Card className="border-dashed">
+				<CardContent className="py-16 text-center">
+					<div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+						<MessageCircle className="h-10 w-10 text-muted-foreground" />
+					</div>
+					<CardTitle className="mt-6 text-xl">No matching discussions</CardTitle>
+					<CardDescription className="mx-auto mt-2 max-w-md text-balance">
+						Try adjusting your search query or check different status filters to find the discussions you're looking for.
 					</CardDescription>
 				</CardContent>
 			</Card>
@@ -106,70 +165,59 @@ export function DiscussionList({
 	}
 
 	return (
-		<div className="space-y-4">
-			{discussions.discussions.map((discussion) => (
+		<div className="space-y-3">
+			{filteredDiscussions.map((discussion) => (
 				<Card
 					key={discussion.id}
 					data-testid={`discussion-card-${discussion.id}`}
+					className="transition-colors hover:bg-muted/50"
 				>
-					<CardContent className="p-6">
-						<div className="flex items-start justify-between">
-							<div className="min-w-0 flex-1">
-								<div className="mb-2 flex items-center gap-3">
-									<h3 className="truncate font-semibold text-lg">
-										{discussion.name}
-									</h3>
-									<DiscussionStatusBadge
-										status={discussion.isActive ? "active" : "inactive"}
-									/>
-								</div>
-
-								{discussion.description && (
-									<p className="mb-3 line-clamp-2 text-muted-foreground text-sm">
-										{discussion.description}
-									</p>
-								)}
-
-								<div className="flex flex-wrap items-center gap-4 text-muted-foreground text-xs">
-									<span className="flex items-center gap-1">
-										<Clock className="h-3 w-3" />
-										Created{" "}
-										{formatDistanceToNow(discussion.createdAt, {
-											addSuffix: true,
-										})}
-									</span>
-									<span className="flex items-center gap-1">
-										<Users className="h-3 w-3" />
-										{discussion.participantCount || 0} participants
-									</span>
-									{discussion.maxParticipants && (
-										<span className="text-muted-foreground">
-											Max: {discussion.maxParticipants}
-										</span>
-									)}
-								</div>
-
-								{discussion.lesson && (
-									<div className="mt-3">
-										<div className="mb-1 text-muted-foreground text-xs">
-											Based on lesson
-										</div>
-										<Badge variant="outline" className="text-xs">
-											{discussion.lesson.title}
-										</Badge>
-									</div>
-								)}
-							</div>
-
-							<div className="ml-4 flex items-center gap-2">
-								<DiscussionActions
-									discussion={discussion}
-									onView={onViewDiscussion}
-									onInvite={onInviteParticipants}
-									onManage={onManageDiscussion}
-								/>
-							</div>
+					<CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+						<div className="min-w-0 flex-1 space-y-1">
+							<CardTitle className="font-semibold text-lg leading-tight tracking-tight">
+								{discussion.name}
+							</CardTitle>
+							{discussion.description && (
+								<CardDescription className="line-clamp-2 text-sm">
+									{discussion.description}
+								</CardDescription>
+							)}
 						</div>
+						<div className="ml-4 flex shrink-0 items-center gap-2">
+							<DiscussionStatusBadge
+								status={discussion.isActive ? "active" : "inactive"}
+							/>
+							<DiscussionActions
+								discussion={discussion}
+								onInvite={onInviteParticipants}
+								onManage={onManageDiscussion}
+							/>
+						</div>
+					</CardHeader>
+					<CardContent className="pt-0">
+						<div className="flex flex-wrap items-center gap-3 text-muted-foreground text-xs">
+							<span className="flex items-center gap-1">
+								<Clock className="h-3 w-3" />
+								{formatDistanceToNow(discussion.createdAt, {
+									addSuffix: true,
+								})}
+							</span>
+							<span className="flex items-center gap-1">
+								<Users className="h-3 w-3" />
+								{discussion.participantCount || 0} participants
+							</span>
+							{discussion.maxParticipants && (
+								<span>Max: {discussion.maxParticipants}</span>
+							)}
+						</div>
+
+						{discussion.lesson && (
+							<div className="mt-2">
+								<Badge variant="outline" className="text-xs">
+									{discussion.lesson.title}
+								</Badge>
+							</div>
+						)}
 					</CardContent>
 				</Card>
 			))}
@@ -194,39 +242,39 @@ function DiscussionStatusBadge({ status }: { status: "active" | "inactive" }) {
 
 function DiscussionActions({
 	discussion,
-	onView,
 	onInvite,
 	onManage,
 }: {
 	discussion: DiscussionData;
-	onView?: (discussionId: string) => void;
 	onInvite?: (discussionId: string) => void;
 	onManage?: (discussionId: string) => void;
 }) {
-	return (
-		<div className="flex items-center gap-1">
-			{!discussion.isActive && (
-				<Button
-					variant="ghost"
-					size="icon"
-					onClick={() => onInvite?.(discussion.id)}
-					title="Invite participants"
-				>
-					<UserPlus className="h-4 w-4" />
-				</Button>
-			)}
+	const hasActions = !discussion.isActive || discussion.isCreator;
 
-			{discussion.isCreator && (
-				<Button
-					variant="ghost"
-					size="icon"
-					className="cursor-pointer"
-					onClick={() => onManage?.(discussion.id)}
-					title="Manage discussion"
-				>
-					<Settings className="h-4 w-4" />
+	if (!hasActions) return null;
+
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger asChild>
+				<Button variant="ghost" size="icon" className="h-8 w-8">
+					<MoreHorizontal className="h-4 w-4" />
+					<span className="sr-only">Open menu</span>
 				</Button>
-			)}
-		</div>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end">
+				{!discussion.isActive && (
+					<DropdownMenuItem onClick={() => onInvite?.(discussion.id)}>
+						<UserPlus className="mr-2 h-4 w-4" />
+						Invite participants
+					</DropdownMenuItem>
+				)}
+				{discussion.isCreator && (
+					<DropdownMenuItem onClick={() => onManage?.(discussion.id)}>
+						<Settings className="mr-2 h-4 w-4" />
+						Manage discussion
+					</DropdownMenuItem>
+				)}
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }

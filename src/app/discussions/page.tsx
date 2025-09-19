@@ -7,8 +7,9 @@ import { useState } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MessageCircle, Plus } from "lucide-react";
+import { Filter, MessageCircle, Plus, Search } from "lucide-react";
 import { CreateDiscussionForm } from "./_components/create-discussion-form";
 import { DiscussionList } from "./_components/discussion-list";
 import { InviteParticipantsModal } from "./_components/invite-participants-modal";
@@ -18,6 +19,8 @@ type ViewMode = "list" | "create";
 export default function DiscussionsPage() {
 	const { data: session, status } = useSession();
 	const [viewMode, setViewMode] = useState<ViewMode>("list");
+	const [searchQuery, setSearchQuery] = useState("");
+	const [statusFilter, setStatusFilter] = useState<string>("all");
 	const [inviteModalOpen, setInviteModalOpen] = useState(false);
 	const [selectedDiscussionId, setSelectedDiscussionId] = useState<
 		string | null
@@ -94,8 +97,26 @@ export default function DiscussionsPage() {
 								</Button>
 							</div>
 
+							{/* Search and Filter Bar */}
+							<div className="flex w-full max-w-md items-center gap-2">
+								<div className="relative flex-1">
+									<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+									<Input
+										placeholder="Search discussions..."
+										value={searchQuery}
+										onChange={(e) => setSearchQuery(e.target.value)}
+										className="pl-9"
+									/>
+								</div>
+								<Button variant="outline" size="icon" title="Filter discussions">
+									<Filter className="h-4 w-4" />
+								</Button>
+							</div>
+
 							{/* Discussion List */}
 							<DiscussionList
+								searchQuery={searchQuery}
+								statusFilter={statusFilter}
 								onViewDiscussion={handleViewDiscussion}
 								onInviteParticipants={(discussionId) => {
 									// We'll need to get the title from the discussion data
