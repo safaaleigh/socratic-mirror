@@ -1,14 +1,12 @@
 "use client";
 
 import {
-	BarChart3,
 	BookOpen,
 	ChevronUp,
 	GraduationCap,
 	LogOut,
 	MessageCircle,
 	User2,
-	Users,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import type * as React from "react";
@@ -36,24 +34,14 @@ import {
 const data = {
 	navMain: [
 		{
-			title: "Lessons",
-			url: "/lessons",
-			icon: GraduationCap,
-		},
-		{
 			title: "Discussions",
 			url: "/discussions",
 			icon: MessageCircle,
 		},
 		{
-			title: "Groups",
-			url: "/groups",
-			icon: Users,
-		},
-		{
-			title: "Dashboard",
-			url: "/dashboard",
-			icon: BarChart3,
+			title: "Lessons",
+			url: "/lessons",
+			icon: GraduationCap,
 		},
 	],
 };

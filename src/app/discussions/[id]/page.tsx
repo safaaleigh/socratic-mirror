@@ -130,7 +130,6 @@ export default function DiscussionPage({
 	}
 
 	const breadcrumbItems = [
-		{ label: "Dashboard", href: "/dashboard" },
 		{ label: "Discussions", href: "/discussions" },
 		{ label: discussion.name, isCurrentPage: true },
 	];

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
@@ -8,24 +9,21 @@ import { HydrateClient } from "@/trpc/server";
 export default async function Home() {
 	const session = await auth();
 
+	// Redirect authenticated users to discussions
+	if (session) {
+		redirect("/discussions");
+	}
+
 	return (
 		<HydrateClient>
 			<div className="min-h-screen bg-background">
 				<header className="absolute top-0 right-0 flex items-center gap-2 p-4">
-					{session ? (
-						<Button asChild size="sm">
-							<Link href="/dashboard">Dashboard</Link>
-						</Button>
-					) : (
-						<>
-							<Button asChild size="sm">
-								<Link href="/auth/signin">Sign In</Link>
-							</Button>
-							<Button asChild variant="outline" size="sm">
-								<Link href="/auth/signup">Sign Up</Link>
-							</Button>
-						</>
-					)}
+					<Button asChild size="sm">
+						<Link href="/auth/signin">Sign In</Link>
+					</Button>
+					<Button asChild variant="outline" size="sm">
+						<Link href="/auth/signup">Sign Up</Link>
+					</Button>
 					<ModeToggle />
 				</header>
 

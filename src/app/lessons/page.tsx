@@ -59,10 +59,7 @@ export default function LessonsPage() {
 		setViewMode("edit");
 	};
 
-	const breadcrumbItems = [
-		{ label: "Dashboard", href: "/dashboard" },
-		{ label: "Lessons", isCurrentPage: true },
-	];
+	const breadcrumbItems = [{ label: "Lessons", isCurrentPage: true }];
 
 	return (
 		<DashboardLayout breadcrumbItems={breadcrumbItems}>

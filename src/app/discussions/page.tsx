@@ -69,10 +69,7 @@ export default function DiscussionsPage() {
 		window.location.href = `/discussions/${discussionId}`;
 	};
 
-	const breadcrumbItems = [
-		{ label: "Dashboard", href: "/dashboard" },
-		{ label: "Discussions", isCurrentPage: true },
-	];
+	const breadcrumbItems = [{ label: "Discussions", isCurrentPage: true }];
 
 	return (
 		<>
