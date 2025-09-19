@@ -64,7 +64,15 @@ export function useEnhancedChat({
 		},
 	);
 
-	// Handle message history loading
+	// For authenticated users, use the message router
+	const authenticatedMessagesQuery = api.message.list.useQuery(
+		{ discussionId, limit: 50 },
+		{
+			enabled: !!currentUserId, // Always enabled for authenticated users
+		},
+	);
+
+	// Handle message history loading for anonymous participants
 	useEffect(() => {
 		if (messageHistoryQuery.isSuccess && messageHistoryQuery.data) {
 			const convertedMessages =
@@ -85,11 +93,52 @@ export function useEnhancedChat({
 		messageHistoryQuery.error,
 	]);
 
-	// For authenticated users, use the message router (TODO: implement this)
-	// const authenticatedMessagesQuery = api.message.list.useQuery(
-	//   { discussionId, limit: 50 },
-	//   { enabled: !hasLoadedInitialMessages && !!currentUserId }
-	// );
+	// Handle message history loading for authenticated users
+	useEffect(() => {
+		if (authenticatedMessagesQuery.isSuccess && authenticatedMessagesQuery.data) {
+			// Convert authenticated messages to UI format
+			const convertedMessages = authenticatedMessagesQuery.data.messages.map((message) => {
+				// Determine sender info - check if it's an AI message or user message
+				let senderName: string;
+				let senderType: string;
+
+				if (message.type === "AI_QUESTION" || message.type === "AI_PROMPT" || message.type === "SYSTEM") {
+					senderName = "AI Facilitator";
+					senderType = "ai";
+				} else if (message.type === "MODERATOR") {
+					senderName = message.author?.name || "Moderator";
+					senderType = "moderator";
+				} else {
+					senderName = message.author?.name || "Unknown User";
+					senderType = "user";
+				}
+
+				return {
+					id: message.id,
+					role: "user" as const,
+					parts: [{ type: "text" as const, text: message.content }],
+					metadata: {
+						senderName,
+						senderType,
+						createdAt: message.createdAt.toISOString(),
+					},
+				};
+			});
+			setExistingMessages(convertedMessages.reverse()); // Reverse to show chronological order
+			setHasLoadedInitialMessages(true);
+		} else if (authenticatedMessagesQuery.isError) {
+			console.error(
+				"Failed to load authenticated message history:",
+				authenticatedMessagesQuery.error,
+			);
+			setHasLoadedInitialMessages(true); // Still mark as loaded to prevent retry
+		}
+	}, [
+		authenticatedMessagesQuery.isSuccess,
+		authenticatedMessagesQuery.data,
+		authenticatedMessagesQuery.isError,
+		authenticatedMessagesQuery.error,
+	]);
 
 	// Configure the transport with the enhanced API endpoint
 	const transport = new DefaultChatTransport({
@@ -124,21 +173,18 @@ export function useEnhancedChat({
 		},
 	});
 
-	// Merge existing messages with AI SDK messages
-	const allMessages = [...existingMessages, ...aiMessages];
+	// Use existing messages from server or AI SDK messages for new messages
+	const allMessages = hasLoadedInitialMessages ? aiMessages : [];
 
-	// Update AI SDK messages when existing messages are loaded
+	// Update AI SDK messages when existing messages are loaded or refreshed
 	useEffect(() => {
-		if (hasLoadedInitialMessages && existingMessages.length > 0) {
-			// Only set messages if AI SDK doesn't have messages yet
-			if (aiMessages.length === 0) {
-				setAiMessages(existingMessages);
-			}
+		if (hasLoadedInitialMessages && existingMessages.length >= 0) {
+			// Always update AI SDK messages when existingMessages change (including after invalidation)
+			setAiMessages(existingMessages);
 		}
 	}, [
 		hasLoadedInitialMessages,
 		existingMessages,
-		aiMessages.length,
 		setAiMessages,
 	]);
 
@@ -213,7 +259,8 @@ export function useEnhancedChat({
 
 		// Loading state
 		isLoadingHistory:
-			!hasLoadedInitialMessages && messageHistoryQuery.isLoading,
+			!hasLoadedInitialMessages &&
+			(messageHistoryQuery.isLoading || authenticatedMessagesQuery.isLoading),
 
 		// Metadata
 		participantInfo: {

@@ -84,6 +84,15 @@ export default function DiscussionPage({
 	const aiFacilitatorMutation = api.aiFacilitator.triggerResponse.useMutation({
 		onSuccess: (data) => {
 			console.log("AI Facilitator triggered successfully:", data.message);
+			// Invalidate message queries to load the new AI message
+			if (paramsResolved?.id) {
+				void utils.participant.getMessageHistory.invalidate({
+					discussionId: paramsResolved.id
+				});
+				void utils.message.list.invalidate({
+					discussionId: paramsResolved.id
+				});
+			}
 		},
 		onError: (error) => {
 			console.error("AI Facilitator error:", error.message);
@@ -178,10 +187,8 @@ export default function DiscussionPage({
 							canJoin={canJoin}
 							isJoining={joinDiscussionMutation.isPending}
 							isLeaving={leaveDiscussionMutation.isPending}
-							isTriggeringAI={aiFacilitatorMutation.isPending}
 							onBack={() => window.history.back()}
 							onInvite={() => setInviteModalOpen(true)}
-							onTriggerAI={handleTriggerAIFacilitator}
 							onJoin={handleJoin}
 							onLeave={handleLeave}
 						/>
@@ -196,6 +203,9 @@ export default function DiscussionPage({
 								displayName={session?.user?.name ?? "User"}
 								className="h-full"
 								isMobile={true}
+								showAIFacilitator={isCreator}
+								onTriggerAI={handleTriggerAIFacilitator}
+								isTriggeringAI={aiFacilitatorMutation.isPending}
 							/>
 						) : (
 							<EmptyDiscussionState
@@ -224,10 +234,8 @@ export default function DiscussionPage({
 								canJoin={canJoin}
 								isJoining={joinDiscussionMutation.isPending}
 								isLeaving={leaveDiscussionMutation.isPending}
-								isTriggeringAI={aiFacilitatorMutation.isPending}
 								onBack={() => window.history.back()}
 								onInvite={() => setInviteModalOpen(true)}
-								onTriggerAI={handleTriggerAIFacilitator}
 								onJoin={handleJoin}
 								onLeave={handleLeave}
 							/>
@@ -240,7 +248,10 @@ export default function DiscussionPage({
 									discussionId={paramsResolved?.id ?? ""}
 									userId={session?.user?.id ?? ""}
 									displayName={session?.user?.name ?? "User"}
-									className="h-full"
+									className="h-full max-h-[600px]"
+									showAIFacilitator={isCreator}
+									onTriggerAI={handleTriggerAIFacilitator}
+									isTriggeringAI={aiFacilitatorMutation.isPending}
 								/>
 							) : (
 								<EmptyDiscussionState

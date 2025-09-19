@@ -13,10 +13,8 @@ interface DiscussionHeaderProps {
 	canJoin: boolean;
 	isJoining?: boolean;
 	isLeaving?: boolean;
-	isTriggeringAI?: boolean;
 	onBack?: () => void;
 	onInvite?: () => void;
-	onTriggerAI?: () => void;
 	onJoin?: () => void;
 	onLeave?: () => void;
 	onSettings?: () => void;
@@ -32,10 +30,8 @@ export function DiscussionHeader({
 	canJoin,
 	isJoining = false,
 	isLeaving = false,
-	isTriggeringAI = false,
 	onBack,
 	onInvite,
-	onTriggerAI,
 	onJoin,
 	onLeave,
 	onSettings,
@@ -104,17 +100,6 @@ export function DiscussionHeader({
 									<Button variant="outline" size="sm" onClick={onInvite} className="flex-1 min-w-[100px]">
 										<UserPlus className="mr-2 h-4 w-4" />
 										Invite
-									</Button>
-								)}
-								{onTriggerAI && (
-									<Button
-										variant="outline"
-										size="sm"
-										onClick={onTriggerAI}
-										disabled={isTriggeringAI}
-										className="flex-1 min-w-[100px]"
-									>
-										{isTriggeringAI ? "🤖 Sending..." : "🤖 AI"}
 									</Button>
 								)}
 								{onSettings && (
@@ -186,16 +171,6 @@ export function DiscussionHeader({
 									<Button variant="outline" size="sm" onClick={onInvite}>
 										<UserPlus className="mr-2 h-4 w-4" />
 										Invite
-									</Button>
-								)}
-								{onTriggerAI && (
-									<Button
-										variant="outline"
-										size="sm"
-										onClick={onTriggerAI}
-										disabled={isTriggeringAI}
-									>
-										{isTriggeringAI ? "🤖 Sending..." : "🤖 AI Facilitator"}
 									</Button>
 								)}
 								{onSettings && (

@@ -9,6 +9,10 @@ interface AuthenticatedChatContainerProps {
 	displayName: string;
 	className?: string;
 	isMobile?: boolean;
+	// AI Facilitator props (admin only)
+	showAIFacilitator?: boolean;
+	onTriggerAI?: () => void;
+	isTriggeringAI?: boolean;
 }
 
 export function AuthenticatedChatContainer({
@@ -17,6 +21,9 @@ export function AuthenticatedChatContainer({
 	displayName,
 	className,
 	isMobile: isMobileProp,
+	showAIFacilitator = false,
+	onTriggerAI,
+	isTriggeringAI = false,
 }: AuthenticatedChatContainerProps) {
 	const [isMobile, setIsMobile] = useState(isMobileProp || false);
 
@@ -49,6 +56,9 @@ export function AuthenticatedChatContainer({
 			currentUserId={userId}
 			isMobile={isMobile}
 			className={className}
+			showAIFacilitator={showAIFacilitator}
+			onTriggerAI={onTriggerAI}
+			isTriggeringAI={isTriggeringAI}
 		/>
 	);
 }

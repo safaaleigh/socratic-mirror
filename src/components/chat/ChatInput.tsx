@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { Send, Square } from "lucide-react";
+import { Sparkles, Send, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface ChatInputProps {
@@ -14,6 +14,10 @@ interface ChatInputProps {
 	maxLength?: number;
 	onStop?: () => void;
 	isMobile?: boolean;
+	// AI Facilitator props (admin only)
+	showAIFacilitator?: boolean;
+	onTriggerAI?: () => void;
+	isTriggeringAI?: boolean;
 }
 
 export function ChatInput({
@@ -24,6 +28,9 @@ export function ChatInput({
 	maxLength = 2000,
 	onStop,
 	isMobile = false,
+	showAIFacilitator = false,
+	onTriggerAI,
+	isTriggeringAI = false,
 }: ChatInputProps) {
 	const [input, setInput] = useState("");
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -160,25 +167,52 @@ export function ChatInput({
 					)}
 				</div>
 
-				{/* Helper text - hide on mobile to save space */}
-				{!isMobile && (
+				{/* Helper text and AI Facilitator button row */}
+				{(!isMobile || showAIFacilitator) && (
 					<div className="mt-2 flex items-center justify-between text-muted-foreground text-xs">
-						<span>
-							{isSending ? (
-								"Sending..."
-							) : (
-								<>
-									<kbd className="rounded bg-muted px-1.5 py-0.5">Enter</kbd> to
-									send,{" "}
-									<kbd className="rounded bg-muted px-1.5 py-0.5">
-										Shift+Enter
-									</kbd>{" "}
-									for new line
-								</>
-							)}
-						</span>
+						{!isMobile && (
+							<span>
+								{isSending ? (
+									"Sending..."
+								) : (
+									<>
+										<kbd className="rounded bg-muted px-1.5 py-0.5">Enter</kbd> to
+										send,{" "}
+										<kbd className="rounded bg-muted px-1.5 py-0.5">
+											Shift+Enter
+										</kbd>{" "}
+										for new line
+									</>
+								)}
+							</span>
+						)}
 
-						{isSending && onStop && (
+						{/* AI Facilitator button for admins */}
+						{showAIFacilitator && (
+							<Button
+								type="button"
+								onClick={onTriggerAI}
+								disabled={isTriggeringAI || isSending}
+								size="sm"
+								variant="outline"
+								className="gap-1.5"
+								aria-label="Trigger AI Facilitator"
+							>
+								{isTriggeringAI ? (
+									<>
+										<div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+										<span className="text-xs">AI Thinking...</span>
+									</>
+								) : (
+									<>
+										<Sparkles className="h-3 w-3" />
+										<span className="text-xs">Ask AI</span>
+									</>
+								)}
+							</Button>
+						)}
+
+						{!isMobile && isSending && onStop && (
 							<span>
 								Press <kbd className="rounded bg-muted px-1.5 py-0.5">Esc</kbd> to
 								stop

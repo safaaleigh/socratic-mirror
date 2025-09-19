@@ -17,6 +17,10 @@ interface ChatContainerProps {
 	currentUserId?: string;
 	className?: string;
 	isMobile?: boolean;
+	// AI Facilitator props (admin only)
+	showAIFacilitator?: boolean;
+	onTriggerAI?: () => void;
+	isTriggeringAI?: boolean;
 }
 
 export function ChatContainer({
@@ -27,6 +31,9 @@ export function ChatContainer({
 	currentUserId,
 	className,
 	isMobile = false,
+	showAIFacilitator = false,
+	onTriggerAI,
+	isTriggeringAI = false,
 }: ChatContainerProps) {
 	const [showError, setShowError] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -124,6 +131,9 @@ export function ChatContainer({
 				placeholder="Share your thoughts..."
 				onStop={stop}
 				isMobile={isMobile}
+				showAIFacilitator={showAIFacilitator}
+				onTriggerAI={onTriggerAI}
+				isTriggeringAI={isTriggeringAI}
 			/>
 		</div>
 	);
