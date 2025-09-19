@@ -221,7 +221,7 @@ describe("Invalid Token Handling", () => {
 		const caller = appRouter.createCaller(ctx);
 
 		// Test extremely long token (should be rejected by schema)
-		const veryLongToken = "cm" + "a".repeat(1000); // Very long invalid token
+		const veryLongToken = `cm${"a".repeat(1000)}`; // Very long invalid token
 
 		await expect(
 			caller.invitation.validate({ token: veryLongToken }),

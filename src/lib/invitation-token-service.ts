@@ -51,7 +51,7 @@ const tokenGenerationSchema = z.object({
 /**
  * Unified Token Service Implementation
  */
-export class UnifiedTokenService implements IUnifiedTokenService {
+class UnifiedTokenService implements IUnifiedTokenService {
 	/**
 	 * Generate an invitation token using smart type selection
 	 */
@@ -68,9 +68,8 @@ export class UnifiedTokenService implements IUnifiedTokenService {
 			// Generate token based on type
 			if (tokenType === "database") {
 				return this.generateDatabaseToken(validatedOptions);
-			} else {
-				return this.generateJWTToken(validatedOptions);
 			}
+			return this.generateJWTToken(validatedOptions);
 		} catch (error) {
 			if (error instanceof z.ZodError) {
 				throw new TokenGenerationError(
@@ -97,9 +96,8 @@ export class UnifiedTokenService implements IUnifiedTokenService {
 		// Auto-detect token type and validate accordingly
 		if (this.isJWTToken(token)) {
 			return this.validateJWTTokenWithDiscussion(token);
-		} else {
-			return this.validateDatabaseTokenWithDiscussion(token);
 		}
+		return this.validateDatabaseTokenWithDiscussion(token);
 	}
 
 	/**
@@ -508,15 +506,14 @@ export const unifiedTokenService = new UnifiedTokenService();
 /**
  * Convenience functions for common operations
  */
-export const generateInvitationTokenUnified = (
-	options: TokenGenerationOptions,
-) => unifiedTokenService.generateToken(options);
+const generateInvitationTokenUnified = (options: TokenGenerationOptions) =>
+	unifiedTokenService.generateToken(options);
 
-export const validateInvitationTokenUnified = (token: string) =>
+const validateInvitationTokenUnified = (token: string) =>
 	unifiedTokenService.validateToken(token);
 
-export const revokeInvitationToken = (token: string) =>
+const revokeInvitationToken = (token: string) =>
 	unifiedTokenService.revokeToken(token);
 
-export const isTokenRevocable = (token: string) =>
+const isTokenRevocable = (token: string) =>
 	unifiedTokenService.isRevocable(token);

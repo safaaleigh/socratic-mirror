@@ -5,7 +5,7 @@ import { env } from "@/env";
 import { verify } from "jsonwebtoken";
 import { WebSocket, WebSocketServer } from "ws";
 
-export interface WebSocketMessage {
+interface WebSocketMessage {
 	type: "message" | "typing" | "join" | "leave" | "error" | "ping" | "pong";
 	discussionId?: string;
 	userId?: string;
@@ -13,7 +13,7 @@ export interface WebSocketMessage {
 	timestamp: number;
 }
 
-export interface MessageEvent {
+interface MessageEvent {
 	type:
 		| "new_message"
 		| "message_edited"
@@ -28,7 +28,7 @@ export interface MessageEvent {
 	timestamp: number;
 }
 
-export interface ConnectedUser {
+interface ConnectedUser {
 	userId: string;
 	userName: string;
 	discussionId: string;
@@ -37,7 +37,7 @@ export interface ConnectedUser {
 	lastActivity: number;
 }
 
-export interface TypingUser {
+interface TypingUser {
 	userId: string;
 	userName: string;
 	discussionId: string;
@@ -628,7 +628,7 @@ export class WebSocketService {
 // Export singleton instance
 let wsService: WebSocketService | null = null;
 
-export function initializeWebSocketService(server: Server): WebSocketService {
+function initializeWebSocketService(server: Server): WebSocketService {
 	if (!wsService) {
 		wsService = new WebSocketService(server);
 		wsService.initialize();

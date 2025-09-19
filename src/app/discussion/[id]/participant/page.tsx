@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Sheet,
 	SheetContent,
@@ -13,6 +12,7 @@ import {
 	SheetTitle,
 	SheetTrigger,
 } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/trpc/react";
 import {
 	AlertCircle,
@@ -332,13 +332,21 @@ export default function ParticipantDiscussionPage() {
 												<span className="font-medium capitalize">Active</span>
 											</div>
 											<div className="flex items-center justify-between">
-												<span className="text-muted-foreground">Total Participants</span>
-												<span className="font-medium">{discussion.participantCount}</span>
+												<span className="text-muted-foreground">
+													Total Participants
+												</span>
+												<span className="font-medium">
+													{discussion.participantCount}
+												</span>
 											</div>
 											{discussion.maxParticipants && (
 												<div className="flex items-center justify-between">
-													<span className="text-muted-foreground">Max Capacity</span>
-													<span className="font-medium">{discussion.maxParticipants}</span>
+													<span className="text-muted-foreground">
+														Max Capacity
+													</span>
+													<span className="font-medium">
+														{discussion.maxParticipants}
+													</span>
 												</div>
 											)}
 										</div>
@@ -362,7 +370,8 @@ export default function ParticipantDiscussionPage() {
 					{/* Discussion title and status */}
 					<div>
 						<h1 className="font-semibold text-base sm:text-lg">
-							Discussion: {discussion.name.length > 30
+							Discussion:{" "}
+							{discussion.name.length > 30
 								? `${discussion.name.substring(0, 30)}...`
 								: discussion.name}
 						</h1>
@@ -427,9 +436,7 @@ export default function ParticipantDiscussionPage() {
 				{/* Desktop sidebar - info */}
 				<div className="hidden w-64 border-l lg:block">
 					<div className="p-4">
-						<h3 className="mb-3 font-medium text-sm">
-							Discussion Info
-						</h3>
+						<h3 className="mb-3 font-medium text-sm">Discussion Info</h3>
 						<div className="space-y-3 text-sm">
 							<div className="flex items-center justify-between">
 								<span className="text-muted-foreground">Status</span>
@@ -437,12 +444,16 @@ export default function ParticipantDiscussionPage() {
 							</div>
 							<div className="flex items-center justify-between">
 								<span className="text-muted-foreground">Participants</span>
-								<span className="font-medium">{discussion.participantCount}</span>
+								<span className="font-medium">
+									{discussion.participantCount}
+								</span>
 							</div>
 							{discussion.maxParticipants && (
 								<div className="flex items-center justify-between">
 									<span className="text-muted-foreground">Max Capacity</span>
-									<span className="font-medium">{discussion.maxParticipants}</span>
+									<span className="font-medium">
+										{discussion.maxParticipants}
+									</span>
 								</div>
 							)}
 						</div>

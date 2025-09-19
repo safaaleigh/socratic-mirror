@@ -1,4 +1,4 @@
-import { type Browser, type Page, chromium } from "playwright";
+import { type Browser, type Page, chromium } from "@playwright/test";
 // T013: Performance test page load times (<2s)
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
@@ -206,7 +206,7 @@ describe("Invitation Page Load Performance", () => {
 			const loadPromises = pages.slice(0, 3).map((page, index) =>
 				page
 					.goto(
-						`http://localhost:3000/invitations/${invitations[index]!.token}`,
+						`http://localhost:3000/invitations/${invitations[index]?.token}`,
 						{
 							waitUntil: "networkidle",
 							timeout: 10000,

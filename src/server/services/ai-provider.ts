@@ -7,7 +7,7 @@ import { createOllama } from "ollama-ai-provider-v2";
 import { z } from "zod";
 
 // Zod schema for AI facilitation responses
-export const facilitationResponseSchema = z.object({
+const facilitationResponseSchema = z.object({
 	content: z
 		.string()
 		.describe("The facilitation content/question to share with participants"),
@@ -33,22 +33,22 @@ export const facilitationResponseSchema = z.object({
 
 export type FacilitationResponse = z.infer<typeof facilitationResponseSchema>;
 
-export interface AIProviderConfig {
+interface AIProviderConfig {
 	temperature?: number;
 	maxTokens?: number;
 }
 
-export interface GenerateTextParams {
+interface GenerateTextParams {
 	system: string;
 	prompt: string;
 	config?: AIProviderConfig;
 }
 
-export interface GenerateObjectParams extends GenerateTextParams {
+interface GenerateObjectParams extends GenerateTextParams {
 	schema: z.ZodSchema;
 }
 
-export class UnifiedAIService {
+class UnifiedAIService {
 	private model: LanguageModel;
 	private providerType: string;
 

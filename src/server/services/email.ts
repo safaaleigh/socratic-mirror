@@ -4,12 +4,12 @@ import { Resend } from "resend";
 // Initialize Resend client
 const resend = new Resend(env.RESEND_API_KEY);
 
-export interface EmailInvitation {
+interface EmailInvitation {
 	email: string;
 	personalMessage?: string;
 }
 
-export interface SendInvitationsParams {
+interface SendInvitationsParams {
 	invitations: EmailInvitation[];
 	discussion: {
 		id: string;
@@ -28,14 +28,14 @@ export interface SendInvitationsParams {
 	expiresAt: Date;
 }
 
-export interface EmailResult {
+interface EmailResult {
 	email: string;
 	invitationId: string;
 	status: "sent" | "failed";
 	error?: string;
 }
 
-export interface SendInvitationsResult {
+interface SendInvitationsResult {
 	sent: EmailResult[];
 	totalSent: number;
 	totalFailed: number;
@@ -288,7 +288,7 @@ If you don't want to receive invitations, you can ignore this email.
 	`.trim();
 };
 
-export class EmailService {
+class EmailService {
 	private resend: Resend;
 
 	constructor() {

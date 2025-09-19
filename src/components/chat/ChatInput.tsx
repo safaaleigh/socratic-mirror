@@ -35,7 +35,7 @@ export function ChatInput({
 			const newHeight = Math.min(textarea.scrollHeight, 120);
 			textarea.style.height = `${newHeight}px`;
 		}
-	}, [input]);
+	});
 
 	// Handle submit
 	const handleSubmit = useCallback(
@@ -108,7 +108,7 @@ export function ChatInput({
 					/>
 
 					{/* Send/Stop button - positioned inside input */}
-					<div className="absolute right-2 top-2">
+					<div className="absolute top-2 right-2">
 						{isSending ? (
 							<Button
 								type="button"

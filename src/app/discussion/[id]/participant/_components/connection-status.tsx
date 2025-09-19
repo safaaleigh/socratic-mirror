@@ -15,7 +15,7 @@ import {
 	Wifi,
 	WifiOff,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type ConnectionState =
 	| "connecting"
@@ -51,7 +51,8 @@ export function ConnectionStatus({
 		const handleOnline = () => {
 			setIsOnline(true);
 			if (connectionState === "disconnected") {
-				attemptConnection();
+				// Trigger reconnection
+				setConnectionState("connecting");
 			}
 		};
 
@@ -70,86 +71,103 @@ export function ConnectionStatus({
 		};
 	}, [connectionState]);
 
-	const attemptConnection = () => {
+	const handleConnectionError = useCallback(
+		(error: any) => {
+			console.error("SSE connection error:", error);
+
+			if (eventSourceRef.current) {
+				eventSourceRef.current.close();
+			}
+
+			if (!isOnline) {
+				setConnectionState("disconnected");
+				setErrorMessage("No internet connection");
+				return;
+			}
+
+			if (reconnectAttempts < maxReconnectAttempts) {
+				setConnectionState("reconnecting");
+				setErrorMessage(
+					`Reconnecting... (${reconnectAttempts + 1}/${maxReconnectAttempts})`,
+				);
+				setReconnectAttempts((prev) => prev + 1);
+
+				const delay = Math.min(reconnectDelay * 2 ** reconnectAttempts, 30000); // Exponential backoff, max 30s
+
+				reconnectTimeoutRef.current = setTimeout(() => {
+					setConnectionState("connecting");
+				}, delay);
+			} else {
+				setConnectionState("error");
+				setErrorMessage("Failed to connect after multiple attempts");
+			}
+		},
+		[isOnline, reconnectAttempts],
+	);
+
+	// Trigger connection attempt when state changes to connecting
+	useEffect(() => {
+		if (connectionState === "connecting" && isOnline) {
+			// Inline the connection logic to avoid dependency issues
+			// Close existing connection
+			if (eventSourceRef.current) {
+				eventSourceRef.current.close();
+			}
+
+			setErrorMessage(null);
+
+			const eventSource = new EventSource(
+				`/api/discussion/${discussionId}/stream?participantToken=${encodeURIComponent(token)}&participantId=${encodeURIComponent(participantId)}`,
+			);
+
+			eventSourceRef.current = eventSource;
+
+			const connectionTimeout = setTimeout(() => {
+				if (eventSource.readyState === EventSource.CONNECTING) {
+					eventSource.close();
+					handleConnectionError(new Error("Connection timeout"));
+				}
+			}, 10000); // 10 second timeout
+
+			eventSource.onopen = () => {
+				clearTimeout(connectionTimeout);
+				setConnectionState("connected");
+				setLastConnected(new Date());
+				setErrorMessage(null);
+				setReconnectAttempts(0);
+			};
+
+			eventSource.onmessage = (event) => {
+				// Connection is working if we receive messages
+				if (connectionState !== "connected") {
+					setConnectionState("connected");
+					setLastConnected(new Date());
+				}
+			};
+
+			eventSource.onerror = (error) => {
+				clearTimeout(connectionTimeout);
+				handleConnectionError(error);
+			};
+		}
+	}, [
+		connectionState,
+		isOnline,
+		discussionId,
+		token,
+		participantId,
+		handleConnectionError,
+	]);
+
+	const attemptConnection = useCallback(() => {
 		if (!isOnline) {
 			setConnectionState("disconnected");
 			setErrorMessage("No internet connection");
 			return;
-		}
-
-		// Close existing connection
-		if (eventSourceRef.current) {
-			eventSourceRef.current.close();
 		}
 
 		setConnectionState("connecting");
-		setErrorMessage(null);
-
-		const eventSource = new EventSource(
-			`/api/discussion/${discussionId}/stream?participantToken=${encodeURIComponent(token)}&participantId=${encodeURIComponent(participantId)}`,
-		);
-
-		eventSourceRef.current = eventSource;
-
-		const connectionTimeout = setTimeout(() => {
-			if (eventSource.readyState === EventSource.CONNECTING) {
-				eventSource.close();
-				handleConnectionError(new Error("Connection timeout"));
-			}
-		}, 10000); // 10 second timeout
-
-		eventSource.onopen = () => {
-			clearTimeout(connectionTimeout);
-			setConnectionState("connected");
-			setLastConnected(new Date());
-			setErrorMessage(null);
-			setReconnectAttempts(0);
-		};
-
-		eventSource.onmessage = (event) => {
-			// Connection is working if we receive messages
-			if (connectionState !== "connected") {
-				setConnectionState("connected");
-				setLastConnected(new Date());
-			}
-		};
-
-		eventSource.onerror = (error) => {
-			clearTimeout(connectionTimeout);
-			handleConnectionError(error);
-		};
-	};
-
-	const handleConnectionError = (error: any) => {
-		console.error("SSE connection error:", error);
-
-		if (eventSourceRef.current) {
-			eventSourceRef.current.close();
-		}
-
-		if (!isOnline) {
-			setConnectionState("disconnected");
-			setErrorMessage("No internet connection");
-			return;
-		}
-
-		if (reconnectAttempts < maxReconnectAttempts) {
-			setConnectionState("reconnecting");
-			setErrorMessage(
-				`Reconnecting... (${reconnectAttempts + 1}/${maxReconnectAttempts})`,
-			);
-			setReconnectAttempts((prev) => prev + 1);
-
-			const delay = Math.min(reconnectDelay * 2 ** reconnectAttempts, 30000); // Exponential backoff, max 30s
-
-			reconnectTimeoutRef.current = setTimeout(() => {
-				attemptConnection();
-			}, delay);
-		} else {
-			setConnectionState("error");
-			setErrorMessage("Failed to connect after multiple attempts");
-		}
-	};
+	}, [isOnline]);
 
 	const handleManualReconnect = () => {
 		setReconnectAttempts(0);
@@ -168,7 +186,7 @@ export function ConnectionStatus({
 				clearTimeout(reconnectTimeoutRef.current);
 			}
 		};
-	}, [discussionId, participantId, token]);
+	}, [attemptConnection]);
 
 	// Periodic connection health check
 	useEffect(() => {
@@ -182,7 +200,7 @@ export function ConnectionStatus({
 
 			return () => clearInterval(healthCheck);
 		}
-	}, [connectionState]);
+	}, [connectionState, handleConnectionError]);
 
 	const getStatusConfig = () => {
 		switch (connectionState) {

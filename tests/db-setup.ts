@@ -49,7 +49,7 @@ export async function createTestUser() {
 }
 
 // Create test context that matches production tRPC context
-export function createTestContext(session?: Session | null) {
+function createTestContext(session?: Session | null) {
 	return {
 		db: testDb,
 		session: session || null,

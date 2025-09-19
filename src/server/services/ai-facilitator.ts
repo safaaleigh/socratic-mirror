@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import type { Discussion, Lesson, Message } from "@prisma/client";
 import { type FacilitationResponse, unifiedAIService } from "./ai-provider";
 
-export interface DiscussionContext {
+interface DiscussionContext {
 	id: string;
 	name: string;
 	description?: string;
@@ -31,7 +31,7 @@ export interface DiscussionContext {
 	duration: string; // e.g., "45 minutes"
 }
 
-export interface AIFacilitationRequest {
+interface AIFacilitationRequest {
 	discussionContext: DiscussionContext;
 	facilitationGoal:
 		| "START_DISCUSSION"
@@ -46,7 +46,7 @@ export interface AIFacilitationRequest {
 	userPrompt?: string;
 }
 
-export interface AIResponse {
+interface AIResponse {
 	content: string;
 	type: "AI_QUESTION" | "AI_PROMPT";
 	suggestedFollowUps?: string[];
@@ -54,7 +54,7 @@ export interface AIResponse {
 	confidence: number; // 0-1
 }
 
-export interface AIConfig {
+interface AIConfig {
 	model: string;
 	temperature: number;
 	maxTokens: number;
@@ -509,7 +509,7 @@ TONE: Encouraging, curious, intellectually rigorous but supportive.
 			} else {
 				const type =
 					options?.promptType === "custom" ? undefined : options?.promptType;
-				prompt = this.generateSimplePrompt(discussion, type);
+				prompt = AIFacilitatorService.generateSimplePrompt(discussion, type);
 			}
 
 			if (!prompt) {
@@ -577,9 +577,11 @@ TONE: Encouraging, curious, intellectually rigorous but supportive.
 		for (const discussion of activeDiscussions) {
 			try {
 				const shouldIntervene =
-					await this.checkIfInterventionNeeded(discussion);
+					await AIFacilitatorService.checkIfInterventionNeeded(discussion);
 				if (shouldIntervene) {
-					const result = await this.triggerOnDemandResponse(discussion.id);
+					const result = await AIFacilitatorService.triggerOnDemandResponse(
+						discussion.id,
+					);
 					if (result.success) {
 						interventionsTriggered++;
 					}
@@ -598,7 +600,7 @@ TONE: Encouraging, curious, intellectually rigorous but supportive.
 	private static async checkIfInterventionNeeded(
 		discussion: any,
 	): Promise<boolean> {
-		const config = this.getFacilitatorConfig(discussion);
+		const config = AIFacilitatorService.getFacilitatorConfig(discussion);
 
 		if (!config.enabled) {
 			return false;
@@ -630,7 +632,10 @@ TONE: Encouraging, curious, intellectually rigorous but supportive.
 		}
 
 		// Check if we should throttle prompts
-		return !(await this.shouldThrottlePrompts(discussion, config));
+		return !(await AIFacilitatorService.shouldThrottlePrompts(
+			discussion,
+			config,
+		));
 	}
 
 	private static getFacilitatorConfig(discussion: any) {
@@ -676,11 +681,10 @@ TONE: Encouraging, curious, intellectually rigorous but supportive.
 		const messageCount = discussion.messages.length;
 		const hasLesson = !!discussion.lesson;
 
-		if (!promptType) {
-			promptType = messageCount === 0 ? "opening" : "continuation";
-		}
+		const resolvedPromptType =
+			promptType ?? (messageCount === 0 ? "opening" : "continuation");
 
-		if (promptType === "opening") {
+		if (resolvedPromptType === "opening") {
 			if (hasLesson && discussion.lesson.keyQuestions?.length) {
 				const questions = discussion.lesson.keyQuestions;
 				const randomQuestion =
@@ -688,40 +692,33 @@ TONE: Encouraging, curious, intellectually rigorous but supportive.
 				return `Welcome to "${discussion.name}"! Let's begin by exploring: ${randomQuestion}`;
 			}
 			return `Welcome to "${discussion.name}"! What brings you to this discussion today?`;
-		} else {
-			// Continuation prompts
-			const facilitationStyle =
-				discussion.lesson?.facilitationStyle || "exploratory";
-
-			if (facilitationStyle === "analytical") {
-				const prompts = [
-					"What evidence supports the points we've discussed?",
-					"Can we identify the underlying assumptions in our reasoning?",
-					"What are the strongest and weakest aspects of the arguments presented?",
-				];
-				return (
-					prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0]
-				);
-			} else if (facilitationStyle === "ethical") {
-				const prompts = [
-					"What ethical considerations are at stake in this discussion?",
-					"Who might be affected by the ideas we're exploring?",
-					"What values seem to be in tension here?",
-				];
-				return (
-					prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0]
-				);
-			} else {
-				const prompts = [
-					"What new perspectives have emerged from our conversation so far?",
-					"What questions are arising for you as we discuss this?",
-					"How might someone with a different background view this issue?",
-				];
-				return (
-					prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0]
-				);
-			}
 		}
+		// Continuation prompts
+		const facilitationStyle =
+			discussion.lesson?.facilitationStyle || "exploratory";
+
+		if (facilitationStyle === "analytical") {
+			const prompts = [
+				"What evidence supports the points we've discussed?",
+				"Can we identify the underlying assumptions in our reasoning?",
+				"What are the strongest and weakest aspects of the arguments presented?",
+			];
+			return prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0];
+		}
+		if (facilitationStyle === "ethical") {
+			const prompts = [
+				"What ethical considerations are at stake in this discussion?",
+				"Who might be affected by the ideas we're exploring?",
+				"What values seem to be in tension here?",
+			];
+			return prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0];
+		}
+		const prompts = [
+			"What new perspectives have emerged from our conversation so far?",
+			"What questions are arising for you as we discuss this?",
+			"How might someone with a different background view this issue?",
+		];
+		return prompts[Math.floor(Math.random() * prompts.length)] ?? prompts[0];
 	}
 }
 

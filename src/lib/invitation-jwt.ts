@@ -41,7 +41,7 @@ export type GenerateTokenOptions = z.infer<typeof GenerateTokenOptions>;
 /**
  * Token validation result
  */
-export interface TokenValidationResult {
+interface TokenValidationResult {
 	valid: boolean;
 	claims?: InvitationTokenClaims;
 	error?: string;
@@ -50,7 +50,7 @@ export interface TokenValidationResult {
 /**
  * Safe token parsing result
  */
-export interface TokenParseResult {
+interface TokenParseResult {
 	success: boolean;
 	discussionId?: string;
 	expiresAt?: Date;
@@ -288,9 +288,9 @@ export const DEFAULT_EXPIRATION = "24h";
 /**
  * Maximum allowed token expiration (30 days)
  */
-export const MAX_EXPIRATION = "30d";
+const MAX_EXPIRATION = "30d";
 
 /**
  * Minimum allowed token expiration (1 minute)
  */
-export const MIN_EXPIRATION = "1m";
+const MIN_EXPIRATION = "1m";

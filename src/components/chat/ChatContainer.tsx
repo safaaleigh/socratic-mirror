@@ -77,7 +77,7 @@ export function ChatContainer({
 	return (
 		<div
 			className={cn(
-				"flex flex-col overflow-hidden bg-background border",
+				"flex flex-col overflow-hidden border bg-background",
 				isMobile
 					? "h-[calc(var(--vh,1vh)*100)] border-0"
 					: "h-[600px] rounded-lg",

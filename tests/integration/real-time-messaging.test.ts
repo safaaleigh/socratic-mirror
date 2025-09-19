@@ -426,12 +426,12 @@ describe("Integration: Real-time Message Sending Flow", () => {
 
 			// All messages should be sent successfully
 			expect(sentMessages).toHaveLength(3);
-			sentMessages.forEach((message) => {
+			for (const message of sentMessages) {
 				expect(message).toMatchObject({
 					content: expect.stringContaining("concurrent message"),
 					senderType: "PARTICIPANT",
 				});
-			});
+			}
 
 			// Each participant should see all three messages
 			const aliceView = await facilitatorCaller.participant.getMessages({

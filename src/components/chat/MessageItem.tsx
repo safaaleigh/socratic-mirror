@@ -108,7 +108,7 @@ export function MessageItem({
 			"bg-purple-500",
 			"bg-fuchsia-500",
 			"bg-pink-500",
-			"bg-rose-500"
+			"bg-rose-500",
 		];
 
 		return colors[Math.abs(hash) % colors.length] || "bg-gray-500";
@@ -125,7 +125,9 @@ export function MessageItem({
 		>
 			{/* Avatar */}
 			<Avatar className="h-8 w-8 shrink-0">
-				<AvatarFallback className={cn("text-xs text-white font-medium", avatarColor)}>
+				<AvatarFallback
+					className={cn("font-medium text-white text-xs", avatarColor)}
+				>
 					{initials}
 				</AvatarFallback>
 			</Avatar>

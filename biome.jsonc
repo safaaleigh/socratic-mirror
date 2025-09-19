@@ -20,6 +20,16 @@
 					}
 				}
 			},
+			"suspicious": {
+				"noExplicitAny": "off",
+				"noImplicitAnyLet": "off",
+				"noArrayIndexKey": "off",
+				"noRedeclare": "off",
+				"noPrototypeBuiltins": "off"
+			},
+			"style": {
+				"noNonNullAssertion": "off"
+			},
 			"recommended": true
 		}
 	}

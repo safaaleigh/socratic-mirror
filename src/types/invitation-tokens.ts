@@ -15,7 +15,7 @@ export type TokenType = "database" | "jwt";
 /**
  * Core token information available in both token types
  */
-export interface BaseTokenInfo {
+interface BaseTokenInfo {
 	discussionId: string;
 	expiresAt: Date;
 	type: TokenType;
@@ -24,7 +24,7 @@ export interface BaseTokenInfo {
 /**
  * Enhanced token information only available for database tokens
  */
-export interface DatabaseTokenInfo extends BaseTokenInfo {
+interface DatabaseTokenInfo extends BaseTokenInfo {
 	type: "database";
 	id: string;
 	invitationType: InvitationType;
@@ -44,7 +44,7 @@ export interface DatabaseTokenInfo extends BaseTokenInfo {
 /**
  * Lightweight token information for JWT tokens
  */
-export interface JWTTokenInfo extends BaseTokenInfo {
+interface JWTTokenInfo extends BaseTokenInfo {
 	type: "jwt";
 	issuedAt: Date;
 }
@@ -52,12 +52,12 @@ export interface JWTTokenInfo extends BaseTokenInfo {
 /**
  * Unified token information (discriminated union)
  */
-export type UnifiedTokenInfo = DatabaseTokenInfo | JWTTokenInfo;
+type UnifiedTokenInfo = DatabaseTokenInfo | JWTTokenInfo;
 
 /**
  * Token validation result
  */
-export interface TokenValidationResult {
+interface TokenValidationResult {
 	valid: boolean;
 	token?: UnifiedTokenInfo;
 	error?: string;
@@ -67,7 +67,7 @@ export interface TokenValidationResult {
 /**
  * Discussion information returned with valid tokens
  */
-export interface TokenDiscussionInfo {
+interface TokenDiscussionInfo {
 	id: string;
 	name: string;
 	participantCount: number;
@@ -143,13 +143,11 @@ export interface IUnifiedTokenService {
 /**
  * Type guards for token discrimination
  */
-export function isDatabaseToken(
-	token: UnifiedTokenInfo,
-): token is DatabaseTokenInfo {
+function isDatabaseToken(token: UnifiedTokenInfo): token is DatabaseTokenInfo {
 	return token.type === "database";
 }
 
-export function isJWTToken(token: UnifiedTokenInfo): token is JWTTokenInfo {
+function isJWTToken(token: UnifiedTokenInfo): token is JWTTokenInfo {
 	return token.type === "jwt";
 }
 

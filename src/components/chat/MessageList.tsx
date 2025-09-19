@@ -66,13 +66,9 @@ export function MessageList({
 		<ScrollArea className="flex-1">
 			<div className="space-y-1 py-4">
 				{/* Loading skeleton for initial load */}
-				{isLoading && messages.length === 0 && (
-					<>
-						{[...Array(3)].map((_, i) => (
-							<MessageSkeleton key={i} />
-						))}
-					</>
-				)}
+				{isLoading &&
+					messages.length === 0 &&
+					[...Array(3)].map((_, i) => <MessageSkeleton key={i} />)}
 
 				{/* Render messages */}
 				{messages.map((message, index) => (
