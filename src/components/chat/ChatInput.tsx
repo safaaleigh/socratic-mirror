@@ -88,61 +88,62 @@ export function ChatInput({
 			)}
 		>
 			<form onSubmit={handleSubmit} className="relative">
-				<div className="flex gap-2">
-					<div className="relative flex-1">
-						<Textarea
-							ref={textareaRef}
-							value={input}
-							onChange={(e) => setInput(e.target.value)}
-							onKeyDown={handleKeyDown}
-							onFocus={() => setIsFocused(true)}
-							onBlur={() => setIsFocused(false)}
-							placeholder={placeholder}
-							disabled={isDisabled}
-							maxLength={maxLength + 100} // Allow slight overflow for better UX
-							className={cn(
-								"max-h-[120px] min-h-[44px] resize-none pr-12",
-								"transition-all duration-200",
-								isOverLimit && "border-destructive focus:ring-destructive",
-							)}
-							aria-label="Message input"
-						/>
+				<div className="relative">
+					<Textarea
+						ref={textareaRef}
+						value={input}
+						onChange={(e) => setInput(e.target.value)}
+						onKeyDown={handleKeyDown}
+						onFocus={() => setIsFocused(true)}
+						onBlur={() => setIsFocused(false)}
+						placeholder={placeholder}
+						disabled={isDisabled}
+						maxLength={maxLength + 100} // Allow slight overflow for better UX
+						className={cn(
+							"max-h-[120px] min-h-[44px] resize-none pr-12",
+							"transition-all duration-200",
+							isOverLimit && "border-destructive focus:ring-destructive",
+						)}
+						aria-label="Message input"
+					/>
 
-						{/* Character count */}
-						{showCharCount && (
-							<div
-								className={cn(
-									"absolute right-2 bottom-2 text-xs transition-opacity",
-									isOverLimit ? "text-destructive" : "text-muted-foreground/70",
-								)}
+					{/* Send/Stop button - positioned inside input */}
+					<div className="absolute right-2 top-2">
+						{isSending ? (
+							<Button
+								type="button"
+								onClick={onStop}
+								size="icon"
+								variant="ghost"
+								className="h-8 w-8"
+								aria-label="Stop generating"
 							>
-								{characterCount}/{maxLength}
-							</div>
+								<Square className="h-4 w-4" />
+							</Button>
+						) : (
+							<Button
+								type="submit"
+								size="icon"
+								variant="ghost"
+								disabled={isDisabled || !input.trim() || isOverLimit}
+								className="h-8 w-8"
+								aria-label="Send message"
+							>
+								<Send className="h-4 w-4" />
+							</Button>
 						)}
 					</div>
 
-					{/* Send/Stop button */}
-					{isSending ? (
-						<Button
-							type="button"
-							onClick={onStop}
-							size="icon"
-							variant="secondary"
-							className="h-[44px] w-[44px]"
-							aria-label="Stop generating"
+					{/* Character count */}
+					{showCharCount && (
+						<div
+							className={cn(
+								"absolute right-12 bottom-2 text-xs transition-opacity",
+								isOverLimit ? "text-destructive" : "text-muted-foreground/70",
+							)}
 						>
-							<Square className="h-4 w-4" />
-						</Button>
-					) : (
-						<Button
-							type="submit"
-							size="icon"
-							disabled={isDisabled || !input.trim() || isOverLimit}
-							className="h-[44px] w-[44px]"
-							aria-label="Send message"
-						>
-							<Send className="h-4 w-4" />
-						</Button>
+							{characterCount}/{maxLength}
+						</div>
 					)}
 				</div>
 

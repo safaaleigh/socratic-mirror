@@ -6,11 +6,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+	Sheet,
+	SheetContent,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from "@/components/ui/sheet";
 import { api } from "@/trpc/react";
 import {
 	AlertCircle,
 	CheckCircle,
 	Clock,
+	Menu,
 	MessageCircle,
 	Users,
 } from "lucide-react";
@@ -281,95 +289,163 @@ export default function ParticipantDiscussionPage() {
 
 	// Main discussion interface
 	return (
-		<div className="min-h-screen bg-background">
-			<div className="container mx-auto flex h-screen flex-col px-4 py-4">
-				{/* Header */}
-				<div className="mb-4 flex-shrink-0">
-					<Card>
-						<CardContent className="p-4">
-							<div className="flex items-center justify-between">
-								<div>
-									<h1 className="font-semibold text-lg">{discussion.name}</h1>
-									<div className="mt-1 flex items-center gap-4 text-muted-foreground text-sm">
-										<div className="flex items-center gap-1">
-											<Users className="h-3 w-3" />
-											<span>{discussion.participantCount} participants</span>
-										</div>
-										<ConnectionStatus
+		<div className="flex h-screen flex-col bg-background">
+			{/* Mobile-optimized header with drawer menu */}
+			<div className="flex items-center justify-between border-b bg-background px-4 py-3">
+				<div className="flex items-center gap-3">
+					{/* Mobile menu button */}
+					<Sheet>
+						<SheetTrigger asChild className="lg:hidden">
+							<Button variant="ghost" size="icon">
+								<Menu className="h-5 w-5" />
+								<span className="sr-only">Open menu</span>
+							</Button>
+						</SheetTrigger>
+						<SheetContent side="left" className="w-[280px] p-0 sm:w-[320px]">
+							<SheetHeader className="border-b px-4 py-3">
+								<SheetTitle className="text-left">
+									Discussion: {discussion.name}
+								</SheetTitle>
+							</SheetHeader>
+							<div className="flex h-full flex-col">
+								{/* Participants section in drawer */}
+								<div className="flex-1 overflow-y-auto p-4">
+									<div className="mb-4">
+										<h3 className="mb-3 font-medium text-sm">
+											Participants ({discussion.participantCount})
+										</h3>
+										<ParticipantList
 											discussionId={discussionId}
 											participantId={participantId}
-											token={token}
+											token={token || ""}
 										/>
 									</div>
+
+									{/* Discussion info in drawer */}
+									<div className="border-t pt-4">
+										<h3 className="mb-3 font-medium text-sm">
+											Discussion Info
+										</h3>
+										<div className="space-y-2 text-sm">
+											<div className="flex items-center justify-between">
+												<span className="text-muted-foreground">Status</span>
+												<span className="font-medium capitalize">Active</span>
+											</div>
+											<div className="flex items-center justify-between">
+												<span className="text-muted-foreground">Total Participants</span>
+												<span className="font-medium">{discussion.participantCount}</span>
+											</div>
+											{discussion.maxParticipants && (
+												<div className="flex items-center justify-between">
+													<span className="text-muted-foreground">Max Capacity</span>
+													<span className="font-medium">{discussion.maxParticipants}</span>
+												</div>
+											)}
+										</div>
+									</div>
 								</div>
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={handleLeaveDiscussion}
-								>
-									Leave
-								</Button>
+
+								{/* Leave button at bottom of drawer */}
+								<div className="border-t p-4">
+									<Button
+										variant="outline"
+										className="w-full"
+										onClick={handleLeaveDiscussion}
+									>
+										Leave Discussion
+									</Button>
+								</div>
 							</div>
-						</CardContent>
-					</Card>
+						</SheetContent>
+					</Sheet>
+
+					{/* Discussion title and status */}
+					<div>
+						<h1 className="font-semibold text-base sm:text-lg">
+							Discussion: {discussion.name.length > 30
+								? `${discussion.name.substring(0, 30)}...`
+								: discussion.name}
+						</h1>
+						<div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
+							<ConnectionStatus
+								discussionId={discussionId}
+								participantId={participantId}
+								token={token}
+							/>
+							<span className="hidden sm:inline">•</span>
+							<span className="hidden sm:inline">
+								{discussion.participantCount} participants
+							</span>
+						</div>
+					</div>
 				</div>
 
-				{/* Main Content */}
-				<div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-4">
-					{/* Participant List - Hidden on mobile, shown on large screens */}
-					<div className="hidden lg:block">
+				{/* Desktop leave button */}
+				<Button
+					variant="outline"
+					size="sm"
+					onClick={handleLeaveDiscussion}
+					className="hidden lg:flex"
+				>
+					Leave
+				</Button>
+
+				{/* Mobile participant count indicator */}
+				<div className="flex items-center gap-1 text-muted-foreground lg:hidden">
+					<Users className="h-4 w-4" />
+					<span className="text-sm">{discussion.participantCount}</span>
+				</div>
+			</div>
+
+			{/* Main chat area - full height on mobile */}
+			<div className="flex min-h-0 flex-1 overflow-hidden">
+				{/* Desktop sidebar - participants */}
+				<div className="hidden w-64 border-r lg:block">
+					<div className="h-full overflow-y-auto p-4">
+						<h3 className="mb-3 font-medium text-sm">
+							Participants ({discussion.participantCount})
+						</h3>
 						<ParticipantList
 							discussionId={discussionId}
 							participantId={participantId}
 							token={token || ""}
 						/>
 					</div>
+				</div>
 
-					{/* Chat Area */}
-					<div className="flex min-h-0 flex-col lg:col-span-2">
-						<ChatContainer
-							discussionId={discussionId}
-							participantId={participantId}
-							sessionId={sessionId}
-							displayName={displayName}
-							className="h-full"
-						/>
-					</div>
+				{/* Chat container - full width on mobile */}
+				<div className="flex flex-1 flex-col">
+					<ChatContainer
+						discussionId={discussionId}
+						participantId={participantId}
+						sessionId={sessionId}
+						displayName={displayName}
+						className="h-full"
+					/>
+				</div>
 
-					{/* Mobile Participant List - Show on mobile, hide on large screens */}
-					<div className="lg:hidden">
-						<ParticipantList
-							discussionId={discussionId}
-							participantId={participantId}
-							token={token || ""}
-						/>
-					</div>
-
-					{/* Right Sidebar - Reserved for future features */}
-					<div className="hidden lg:block">
-						<Card className="h-full">
-							<CardContent className="p-4">
-								<h3 className="mb-2 font-medium text-muted-foreground text-sm">
-									Discussion Info
-								</h3>
-								<div className="space-y-2 text-sm">
-									<div className="flex items-center justify-between">
-										<span>Status</span>
-										<span className="capitalize">Active</span>
-									</div>
-									<div className="flex items-center justify-between">
-										<span>Participants</span>
-										<span>{discussion.participantCount}</span>
-									</div>
-									{discussion.maxParticipants && (
-										<div className="flex items-center justify-between">
-											<span>Max Participants</span>
-											<span>{discussion.maxParticipants}</span>
-										</div>
-									)}
+				{/* Desktop sidebar - info */}
+				<div className="hidden w-64 border-l lg:block">
+					<div className="p-4">
+						<h3 className="mb-3 font-medium text-sm">
+							Discussion Info
+						</h3>
+						<div className="space-y-3 text-sm">
+							<div className="flex items-center justify-between">
+								<span className="text-muted-foreground">Status</span>
+								<span className="font-medium capitalize">Active</span>
+							</div>
+							<div className="flex items-center justify-between">
+								<span className="text-muted-foreground">Participants</span>
+								<span className="font-medium">{discussion.participantCount}</span>
+							</div>
+							{discussion.maxParticipants && (
+								<div className="flex items-center justify-between">
+									<span className="text-muted-foreground">Max Capacity</span>
+									<span className="font-medium">{discussion.maxParticipants}</span>
 								</div>
-							</CardContent>
-						</Card>
+							)}
+						</div>
 					</div>
 				</div>
 			</div>

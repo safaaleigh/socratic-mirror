@@ -1,6 +1,6 @@
 "use client";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { UIMessage } from "ai";
 
@@ -38,15 +38,83 @@ export function MessageItem({
 		(messageType === "AI_QUESTION" || messageType === "AI_PROMPT");
 	const isSystemMessage = senderType === "SYSTEM";
 
-	// Get initials for avatar
-	const initials = isAIFacilitator
-		? "🤖"
-		: senderName
-				.split(" ")
-				.map((n) => n[0])
-				.join("")
-				.toUpperCase()
-				.slice(0, 2);
+	// Get initials for avatar - safer approach without non-null assertions
+	const getInitials = (name: string): string => {
+		if (!name || name.trim() === "" || name === "Anonymous") {
+			return "A";
+		}
+
+		const cleanName = name.trim();
+
+		// Handle single character names
+		if (cleanName.length === 1) {
+			return cleanName.toUpperCase();
+		}
+
+		// Split by spaces and filter empty strings
+		const words = cleanName.split(/\s+/).filter((word) => word.length > 0);
+
+		if (words.length === 0) {
+			return "A";
+		}
+
+		if (words.length === 1) {
+			// Single word: take first 2 characters
+			const word = words[0];
+			if (!word) return "A";
+			return word.length >= 2
+				? word.substring(0, 2).toUpperCase()
+				: word.toUpperCase();
+		}
+
+		// Multiple words: take first letter of first two words
+		const firstWord = words[0];
+		const secondWord = words[1];
+
+		if (!firstWord || !secondWord) {
+			return firstWord ? firstWord.charAt(0).toUpperCase() : "A";
+		}
+
+		return (firstWord.charAt(0) + secondWord.charAt(0)).toUpperCase();
+	};
+
+	const initials = isAIFacilitator ? "🤖" : getInitials(senderName);
+
+	// Generate consistent color based on sender name
+	const getAvatarColor = (name: string): string => {
+		if (isAIFacilitator) return "bg-blue-500";
+
+		// Simple hash function to generate consistent colors
+		let hash = 0;
+		for (let i = 0; i < name.length; i++) {
+			hash = name.charCodeAt(i) + ((hash << 5) - hash);
+		}
+
+		// Array of pleasant colors
+		const colors = [
+			"bg-red-500",
+			"bg-orange-500",
+			"bg-amber-500",
+			"bg-yellow-500",
+			"bg-lime-500",
+			"bg-green-500",
+			"bg-emerald-500",
+			"bg-teal-500",
+			"bg-cyan-500",
+			"bg-sky-500",
+			"bg-blue-500",
+			"bg-indigo-500",
+			"bg-violet-500",
+			"bg-purple-500",
+			"bg-fuchsia-500",
+			"bg-pink-500",
+			"bg-rose-500"
+		];
+
+		return colors[Math.abs(hash) % colors.length] || "bg-gray-500";
+	};
+
+	const avatarColor = getAvatarColor(senderName);
 
 	return (
 		<div
@@ -57,8 +125,9 @@ export function MessageItem({
 		>
 			{/* Avatar */}
 			<Avatar className="h-8 w-8 shrink-0">
-				<AvatarImage src={undefined} alt={senderName} />
-				<AvatarFallback className="text-xs">{initials}</AvatarFallback>
+				<AvatarFallback className={cn("text-xs text-white font-medium", avatarColor)}>
+					{initials}
+				</AvatarFallback>
 			</Avatar>
 
 			{/* Message Content */}

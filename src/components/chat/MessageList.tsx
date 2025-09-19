@@ -34,17 +34,19 @@ export function MessageList({
 
 	// Determine if a message is from the current user
 	const isCurrentUserMessage = (message: UIMessage) => {
+		// For authenticated users
 		if (currentUserId && message.metadata?.userId === currentUserId) {
 			return true;
 		}
+		// For participants
 		if (
 			currentParticipantId &&
 			message.metadata?.participantId === currentParticipantId
 		) {
 			return true;
 		}
-		// Check by role as fallback
-		return message.role === "user";
+		// Don't use role as fallback - this was causing all user messages to appear as current user
+		return false;
 	};
 
 	if (messages.length === 0 && !isLoading) {
@@ -73,9 +75,9 @@ export function MessageList({
 				)}
 
 				{/* Render messages */}
-				{messages.map((message) => (
+				{messages.map((message, index) => (
 					<MessageItem
-						key={message.id}
+						key={`${message.id}-${index}`}
 						message={message}
 						displayName={displayName}
 						isCurrentUser={isCurrentUserMessage(message)}

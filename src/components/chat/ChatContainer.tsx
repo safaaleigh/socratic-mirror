@@ -1,7 +1,6 @@
 "use client";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -76,12 +75,12 @@ export function ChatContainer({
 	}, [isMobile]);
 
 	return (
-		<Card
+		<div
 			className={cn(
-				"flex flex-col overflow-hidden",
+				"flex flex-col overflow-hidden bg-background border",
 				isMobile
-					? "h-[calc(var(--vh,1vh)*100)] rounded-none border-0"
-					: "h-[600px]",
+					? "h-[calc(var(--vh,1vh)*100)] border-0"
+					: "h-[600px] rounded-lg",
 				className,
 			)}
 		>
@@ -125,6 +124,6 @@ export function ChatContainer({
 				placeholder="Share your thoughts..."
 				onStop={stop}
 			/>
-		</Card>
+		</div>
 	);
 }
