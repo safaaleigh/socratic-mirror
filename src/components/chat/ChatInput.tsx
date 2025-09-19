@@ -13,6 +13,7 @@ interface ChatInputProps {
 	placeholder?: string;
 	maxLength?: number;
 	onStop?: () => void;
+	isMobile?: boolean;
 }
 
 export function ChatInput({
@@ -22,6 +23,7 @@ export function ChatInput({
 	placeholder = "Type a message...",
 	maxLength = 2000,
 	onStop,
+	isMobile = false,
 }: ChatInputProps) {
 	const [input, setInput] = useState("");
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -83,7 +85,8 @@ export function ChatInput({
 	return (
 		<div
 			className={cn(
-				"border-t bg-background p-4 transition-all",
+				"border-t bg-background transition-all",
+				isMobile ? "p-3" : "p-4",
 				isFocused && "bg-accent/5",
 			)}
 		>
@@ -100,25 +103,32 @@ export function ChatInput({
 						disabled={isDisabled}
 						maxLength={maxLength + 100} // Allow slight overflow for better UX
 						className={cn(
-							"max-h-[120px] min-h-[44px] resize-none pr-12",
-							"transition-all duration-200",
+							"resize-none transition-all duration-200",
+							isMobile
+								? "max-h-[100px] min-h-[48px] pr-14 text-base" // Larger touch target on mobile
+								: "max-h-[120px] min-h-[44px] pr-12",
 							isOverLimit && "border-destructive focus:ring-destructive",
 						)}
 						aria-label="Message input"
 					/>
 
 					{/* Send/Stop button - positioned inside input */}
-					<div className="absolute top-2 right-2">
+					<div className={cn(
+						"absolute top-2 right-2",
+						isMobile && "top-3 right-3" // Better positioning on mobile
+					)}>
 						{isSending ? (
 							<Button
 								type="button"
 								onClick={onStop}
 								size="icon"
 								variant="ghost"
-								className="h-8 w-8"
+								className={cn(
+									isMobile ? "h-10 w-10" : "h-8 w-8" // Larger touch target on mobile
+								)}
 								aria-label="Stop generating"
 							>
-								<Square className="h-4 w-4" />
+								<Square className={cn(isMobile ? "h-5 w-5" : "h-4 w-4")} />
 							</Button>
 						) : (
 							<Button
@@ -126,10 +136,12 @@ export function ChatInput({
 								size="icon"
 								variant="ghost"
 								disabled={isDisabled || !input.trim() || isOverLimit}
-								className="h-8 w-8"
+								className={cn(
+									isMobile ? "h-10 w-10" : "h-8 w-8" // Larger touch target on mobile
+								)}
 								aria-label="Send message"
 							>
-								<Send className="h-4 w-4" />
+								<Send className={cn(isMobile ? "h-5 w-5" : "h-4 w-4")} />
 							</Button>
 						)}
 					</div>
@@ -138,7 +150,8 @@ export function ChatInput({
 					{showCharCount && (
 						<div
 							className={cn(
-								"absolute right-12 bottom-2 text-xs transition-opacity",
+								"absolute bottom-2 text-xs transition-opacity",
+								isMobile ? "right-16" : "right-12",
 								isOverLimit ? "text-destructive" : "text-muted-foreground/70",
 							)}
 						>
@@ -147,30 +160,32 @@ export function ChatInput({
 					)}
 				</div>
 
-				{/* Helper text */}
-				<div className="mt-2 flex items-center justify-between text-muted-foreground text-xs">
-					<span>
-						{isSending ? (
-							"Sending..."
-						) : (
-							<>
-								<kbd className="rounded bg-muted px-1.5 py-0.5">Enter</kbd> to
-								send,{" "}
-								<kbd className="rounded bg-muted px-1.5 py-0.5">
-									Shift+Enter
-								</kbd>{" "}
-								for new line
-							</>
-						)}
-					</span>
-
-					{isSending && onStop && (
+				{/* Helper text - hide on mobile to save space */}
+				{!isMobile && (
+					<div className="mt-2 flex items-center justify-between text-muted-foreground text-xs">
 						<span>
-							Press <kbd className="rounded bg-muted px-1.5 py-0.5">Esc</kbd> to
-							stop
+							{isSending ? (
+								"Sending..."
+							) : (
+								<>
+									<kbd className="rounded bg-muted px-1.5 py-0.5">Enter</kbd> to
+									send,{" "}
+									<kbd className="rounded bg-muted px-1.5 py-0.5">
+										Shift+Enter
+									</kbd>{" "}
+									for new line
+								</>
+							)}
 						</span>
-					)}
-				</div>
+
+						{isSending && onStop && (
+							<span>
+								Press <kbd className="rounded bg-muted px-1.5 py-0.5">Esc</kbd> to
+								stop
+							</span>
+						)}
+					</div>
+				)}
 			</form>
 		</div>
 	);

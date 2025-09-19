@@ -8,6 +8,7 @@ interface AuthenticatedChatContainerProps {
 	userId: string;
 	displayName: string;
 	className?: string;
+	isMobile?: boolean;
 }
 
 export function AuthenticatedChatContainer({
@@ -15,10 +16,17 @@ export function AuthenticatedChatContainer({
 	userId,
 	displayName,
 	className,
+	isMobile: isMobileProp,
 }: AuthenticatedChatContainerProps) {
-	const [isMobile, setIsMobile] = useState(false);
+	const [isMobile, setIsMobile] = useState(isMobileProp || false);
 
 	useEffect(() => {
+		// Use prop if provided, otherwise detect mobile
+		if (isMobileProp !== undefined) {
+			setIsMobile(isMobileProp);
+			return;
+		}
+
 		const checkMobile = () => {
 			setIsMobile(window.innerWidth < 768);
 		};
@@ -26,7 +34,7 @@ export function AuthenticatedChatContainer({
 		checkMobile();
 		window.addEventListener("resize", checkMobile);
 		return () => window.removeEventListener("resize", checkMobile);
-	}, []);
+	}, [isMobileProp]);
 
 	// For authenticated users, we create a stable participant ID based on their user ID
 	const participantId = `user_${userId}`;

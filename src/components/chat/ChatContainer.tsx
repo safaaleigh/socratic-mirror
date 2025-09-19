@@ -123,6 +123,7 @@ export function ChatContainer({
 				isSending={isSending}
 				placeholder="Share your thoughts..."
 				onStop={stop}
+				isMobile={isMobile}
 			/>
 		</div>
 	);

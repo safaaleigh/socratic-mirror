@@ -77,7 +77,6 @@ export default function DiscussionsPage() {
 	return (
 		<>
 			<DashboardLayout breadcrumbItems={breadcrumbItems}>
-
 				<div className="grid gap-6">
 					{viewMode === "list" && (
 						<>
@@ -100,7 +99,7 @@ export default function DiscussionsPage() {
 							{/* Search and Filter Bar */}
 							<div className="flex w-full max-w-md items-center gap-2">
 								<div className="relative flex-1">
-									<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+									<Search className="-translate-y-1/2 absolute top-1/2 left-3 h-4 w-4 text-muted-foreground" />
 									<Input
 										placeholder="Search discussions..."
 										value={searchQuery}
@@ -108,7 +107,11 @@ export default function DiscussionsPage() {
 										className="pl-9"
 									/>
 								</div>
-								<Button variant="outline" size="icon" title="Filter discussions">
+								<Button
+									variant="outline"
+									size="icon"
+									title="Filter discussions"
+								>
 									<Filter className="h-4 w-4" />
 								</Button>
 							</div>
@@ -165,7 +168,6 @@ export default function DiscussionsPage() {
 									</div>
 								</div>
 							</div>
-
 						</>
 					)}
 

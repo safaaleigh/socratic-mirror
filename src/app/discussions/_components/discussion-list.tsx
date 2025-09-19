@@ -155,9 +155,12 @@ export function DiscussionList({
 					<div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-muted">
 						<MessageCircle className="h-10 w-10 text-muted-foreground" />
 					</div>
-					<CardTitle className="mt-6 text-xl">No matching discussions</CardTitle>
+					<CardTitle className="mt-6 text-xl">
+						No matching discussions
+					</CardTitle>
 					<CardDescription className="mx-auto mt-2 max-w-md text-balance">
-						Try adjusting your search query or check different status filters to find the discussions you're looking for.
+						Try adjusting your search query or check different status filters to
+						find the discussions you're looking for.
 					</CardDescription>
 				</CardContent>
 			</Card>
